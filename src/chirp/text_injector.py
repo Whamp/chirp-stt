@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -97,9 +98,12 @@ class TextInjector:
             self._logger.error("Clipboard copy failed: %s", exc)
             return
         time.sleep(0.12)
-        combo = "ctrl+v" if self._paste_mode == "ctrl" else "ctrl+shift+v"
         try:
-            self._keyboard.send(combo)
+            if sys.platform.startswith("win"):
+                self._keyboard.write(processed)
+            else:
+                combo = "ctrl+v" if self._paste_mode == "ctrl" else "ctrl+shift+v"
+                self._keyboard.send(combo)
         except Exception as exc:  # pragma: no cover - runtime safety
             self._logger.error("Paste injection failed: %s", exc)
         if self._clipboard_behavior:

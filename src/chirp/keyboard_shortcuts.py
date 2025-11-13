@@ -20,5 +20,8 @@ class KeyboardShortcutManager:
     def send(self, combination: str) -> None:
         keyboard.send(combination)
 
+    def write(self, text: str) -> None:
+        keyboard.write(text)
+
     def wait(self) -> None:
         keyboard.wait()
