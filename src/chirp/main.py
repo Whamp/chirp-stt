@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import platform
 import threading
+import time
 from typing import Optional, Sequence
 
 from .audio_capture import AudioCapture
@@ -14,11 +17,27 @@ from .text_injector import TextInjector
 
 
 class ChirpApp:
-    def __init__(self) -> None:
-        self.logger = get_logger()
+    def __init__(self, *, verbose: bool = False) -> None:
+        level = logging.DEBUG if verbose else logging.INFO
+        self.logger = get_logger(level=level)
         self.config_manager = ConfigManager()
         self.config = self.config_manager.load()
         model_dir = self.config_manager.model_dir(self.config.parakeet_model, self.config.parakeet_quantization)
+        self.logger.debug(
+            "Environment: platform=%s python=%s config=%s models=%s",
+            platform.platform(),
+            platform.python_version(),
+            self.config_manager.config_path,
+            self.config_manager.models_root,
+        )
+        self.logger.debug(
+            "Config summary: model=%s quantization=%s provider=%s threads=%s paste_mode=%s",
+            self.config.parakeet_model,
+            self.config.parakeet_quantization or "none",
+            self.config.onnx_providers,
+            self.config.threads,
+            self.config.paste_mode,
+        )
 
         self.keyboard = KeyboardShortcutManager(logger=self.logger)
         self.audio_capture = AudioCapture(status_callback=self._log_capture_status)
@@ -57,6 +76,7 @@ class ChirpApp:
             self.logger.info("Interrupted, exiting.")
 
     def _register_hotkey(self) -> None:
+        self.logger.debug("Registering hotkey: %s", self.config.primary_shortcut)
         try:
             self.keyboard.register(self.config.primary_shortcut, self.toggle_recording)
         except Exception:
@@ -71,6 +91,7 @@ class ChirpApp:
                 self._stop_recording()
 
     def _start_recording(self) -> None:
+        self.logger.debug("Starting audio capture")
         try:
             self.audio_capture.start()
         except Exception as exc:
@@ -81,6 +102,7 @@ class ChirpApp:
         self.logger.info("Recording started")
 
     def _stop_recording(self) -> None:
+        self.logger.debug("Stopping audio capture")
         waveform = self.audio_capture.stop()
         self._recording = False
         self.audio_feedback.play_stop(self.config.stop_sound_path)
@@ -88,6 +110,7 @@ class ChirpApp:
         threading.Thread(target=self._transcribe_and_inject, args=(waveform,), daemon=True).start()
 
     def _transcribe_and_inject(self, waveform) -> None:
+        start_time = time.perf_counter()
         if waveform.size == 0:
             self.logger.warning("No audio samples captured")
             return
@@ -96,6 +119,8 @@ class ChirpApp:
         except Exception as exc:
             self.logger.exception("Transcription failed: %s", exc)
             return
+        duration = time.perf_counter() - start_time
+        self.logger.debug("Transcription finished in %.2fs (chars=%s)", duration, len(text))
         if not text.strip():
             self.logger.info("Transcription empty; skipping paste")
             return
@@ -118,12 +143,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "to toggle recording on and off."
         ),
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose debug logging",
+    )
     return parser
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
-    _build_parser().parse_args(argv)
-    app = ChirpApp()
+    args = _build_parser().parse_args(argv)
+    app = ChirpApp(verbose=args.verbose)
     app.run()
 
 
