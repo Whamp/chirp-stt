@@ -20,10 +20,10 @@ class AudioFeedback:
         self._enabled = enabled and winsound is not None
 
     def play_start(self, override_path: Optional[str] = None) -> None:
-        self._play_sound("start.wav", override_path)
+        self._play_sound("ping-up.wav", override_path)
 
     def play_stop(self, override_path: Optional[str] = None) -> None:
-        self._play_sound("stop.wav", override_path)
+        self._play_sound("ping-down.wav", override_path)
 
     def _play_sound(self, asset_name: str, override_path: Optional[str]) -> None:
         if not self._enabled:
