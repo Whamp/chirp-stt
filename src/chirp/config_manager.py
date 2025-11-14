@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import json
 import re
+import tomllib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
-
-from platformdirs import PlatformDirs
+from typing import Any, Dict, Optional
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ASSETS_ROOT = PROJECT_ROOT / "src" / "chirp" / "assets"
 MODELS_ROOT = ASSETS_ROOT / "models"
-CONFIG_PATH = PROJECT_ROOT / "config.json"
+CONFIG_PATH = PROJECT_ROOT / "config.toml"
 
 
 @dataclass(kw_only=True, slots=True)
@@ -35,17 +33,27 @@ class ChirpConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ChirpConfig":
-        merged = DEFAULT_CONFIG | data
+        merged: Dict[str, Any] = dict(data)
+        overrides = merged.get("word_overrides", {}) or {}
         merged["word_overrides"] = {
-            str(k).lower(): str(v) for k, v in merged.get("word_overrides", {}).items()
+            str(k).lower(): str(v) for k, v in overrides.items()
         }
-        merged["primary_shortcut"] = str(merged["primary_shortcut"]).lower()
-        merged["paste_mode"] = str(merged["paste_mode"]).lower()
-        merged["onnx_providers"] = str(merged["onnx_providers"]).lower()
+
+        if "primary_shortcut" in merged:
+            merged["primary_shortcut"] = str(merged["primary_shortcut"]).lower()
+        if "paste_mode" in merged:
+            merged["paste_mode"] = str(merged["paste_mode"]).lower()
+        if "onnx_providers" in merged:
+            merged["onnx_providers"] = str(merged["onnx_providers"]).lower()
+
         quant = merged.get("parakeet_quantization")
-        merged["parakeet_quantization"] = str(quant).lower() if quant else None
+        if quant is not None:
+            merged["parakeet_quantization"] = str(quant).lower()
+
         lang = merged.get("language")
-        merged["language"] = str(lang) if lang else None
+        if lang is not None:
+            merged["language"] = str(lang)
+
         return cls(**merged)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -54,31 +62,11 @@ class ChirpConfig:
         return payload
 
 
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "primary_shortcut": "win+alt+d",
-    "stt_backend": "parakeet",
-    "parakeet_model": "nemo-parakeet-tdt-0.6b-v3",
-    "parakeet_quantization": None,
-    "onnx_providers": "cpu",
-    "threads": None,
-    "language": None,
-    "word_overrides": {},
-    "whisper_prompt": "",
-    "paste_mode": "ctrl",
-    "clipboard_behavior": True,
-    "clipboard_clear_delay": 0.75,
-    "audio_feedback": True,
-    "start_sound_path": None,
-    "stop_sound_path": None,
-}
-
-
 class ConfigManager:
-    def __init__(self, *, app_name: str = "Chirp", legacy_app_author: Optional[str] = "Will") -> None:
+    def __init__(self) -> None:
         self._config_path = CONFIG_PATH
         self._models_root = MODELS_ROOT
         self._models_root.mkdir(parents=True, exist_ok=True)
-        self._migrate_legacy_config(app_name=app_name, legacy_app_author=legacy_app_author)
 
     @property
     def config_path(self) -> Path:
@@ -89,42 +77,20 @@ class ConfigManager:
         return self._models_root
 
     def ensure_exists(self) -> None:
-        if self._config_path.exists():
-            return
-        self._config_path.parent.mkdir(parents=True, exist_ok=True)
-        self._config_path.write_text(json.dumps(DEFAULT_CONFIG, indent=2), encoding="utf-8")
+        if not self._config_path.exists():
+            raise FileNotFoundError(f"Config file not found at {self._config_path}")
 
     def load(self) -> ChirpConfig:
         self.ensure_exists()
-        data = json.loads(self._config_path.read_text(encoding="utf-8"))
+        with self._config_path.open("rb") as handle:
+            data = tomllib.load(handle)
         return ChirpConfig.from_dict(data)
 
     def save(self, config: ChirpConfig) -> None:
-        self._config_path.parent.mkdir(parents=True, exist_ok=True)
-        self._config_path.write_text(json.dumps(config.to_dict(), indent=2), encoding="utf-8")
+        raise NotImplementedError("Saving config.toml is not supported; edit the file manually.")
 
     def model_dir(self, model_name: str, quantization: Optional[str]) -> Path:
         suffix = "-int8" if (quantization or "").lower() == "int8" else ""
         safe = re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-") or "model"
         return self._models_root / f"{safe}{suffix}"
 
-    def _migrate_legacy_config(self, *, app_name: str, legacy_app_author: Optional[str]) -> None:
-        if self._config_path.exists():
-            return
-        for directory in self._legacy_config_dirs(app_name=app_name, legacy_app_author=legacy_app_author):
-            candidate = directory / "config.json"
-            if candidate.exists():
-                self._config_path.parent.mkdir(parents=True, exist_ok=True)
-                self._config_path.write_text(candidate.read_text(encoding="utf-8"), encoding="utf-8")
-                return
-
-    def _legacy_config_dirs(self, *, app_name: str, legacy_app_author: Optional[str]) -> Iterable[Path]:
-        dirs = [Path(PlatformDirs(appname=app_name, appauthor=False, roaming=True).user_config_dir)]
-        if legacy_app_author:
-            dirs.append(Path(PlatformDirs(appname=app_name, appauthor=legacy_app_author, roaming=True).user_config_dir))
-        seen: set[Path] = set()
-        for directory in dirs:
-            if directory in seen:
-                continue
-            seen.add(directory)
-            yield directory

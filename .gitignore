@@ -187,7 +187,6 @@ data/
 !src/chirp/assets/*.wav
 
 # Configuration and user data
-/config.json
 user_data/
 logs/
 *.log

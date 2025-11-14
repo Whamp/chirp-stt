@@ -1,0 +1,15 @@
+primary_shortcut = "ctrl+shift"
+stt_backend = "parakeet"
+parakeet_model = "nemo-parakeet-tdt-0.6b-v3"
+parakeet_quantization = ""
+onnx_providers = "cpu"
+threads = 0
+language = ""
+word_overrides = {}
+whisper_prompt = ""
+paste_mode = "ctrl"
+clipboard_behavior = true
+clipboard_clear_delay = 0.75
+audio_feedback = true
+start_sound_path = ""
+stop_sound_path = ""
