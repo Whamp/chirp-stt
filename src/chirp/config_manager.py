@@ -93,4 +93,3 @@ class ConfigManager:
         suffix = "-int8" if (quantization or "").lower() == "int8" else ""
         safe = re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-") or "model"
         return self._models_root / f"{safe}{suffix}"
-
