@@ -1,6 +1,6 @@
 # Chirp
 
-Chirp is a Windows dictation app that runs fully locally using ParakeetV3 and is managed end-to-end with `uv`. Chirp does not require the ability to run executable files (like .exe) on Windows. It was designed so that if you're allowed to run Python on your machine, you can run Chirp. 
+Chirp is a Windows dictation app that runs fully locally using ParakeetV3 STT and is managed end-to-end with `uv`. Chirp does not require the ability to run executable files (like .exe) on Windows. It was designed so that if you're allowed to run Python on your machine, you can run Chirp. 
 
 ## Why ParakeetV3? 
 
@@ -10,8 +10,8 @@ https://huggingface.co/spaces/hf-audio/open_asr_leaderboard
 
 ## Goals
 - Provide fast, reliable, local-first dictation on Windows.
-- Keep onboarding to a single setup step with predictable daily usage.
-- Maintain a minimal, auditable codebase with explicit configuration.
+- GPU not needed or wanted.
+- Corporate environment friendly - NO NEW EXECUTABLES (.exe) REQUIRED. If you can run python you can run chirp.
 
 ## Features
 - Local STT via Parakeet TDT 0.6B v3 with optional int8 quantization.
@@ -46,6 +46,32 @@ https://huggingface.co/spaces/hf-audio/open_asr_leaderboard
   ```powershell
   uv run python -m chirp.main -- --help
   ```
+## Customization
+
+- The config.toml has sensible defaults but is fully customizable.
+- config.toml also allows for word_overrides ie. parra keet -> parakeet
+  config.toml:
+```
+primary_shortcut = "ctrl+shift"                 # Hotkey that toggles recording; any combination supported by the `keyboard` library works (e.g. "ctrl+shift+space").
+stt_backend = "parakeet"                        # Only "parakeet" is bundled today, but keeping this key lets us add more backends later if needed.
+parakeet_model = "nemo-parakeet-tdt-0.6b-v3"    # Deployed ONNX bundle name; keep as-is unless new models are added.
+parakeet_quantization = ""                      # Set to "int8" to download/use the quantized model variant; leave blank for default fp16.
+onnx_providers = "cpu"                          # ONNX runtime provider string (comma- or pipe-separated if your build supports multiple providers, e.g. "cuda" or "cpu|dml").
+threads = 0                                     # 0 (or empty) lets ONNX decide; set a positive integer to pin thread usage.
+language = "en"                                 # Optional ISO language code; leave blank to let Parakeet auto-detect.
+post_processing = ""                            # Text prompt for the StyleGuide; see docs/post_processing_style_guide.md (e.g. "sentence case", "prepend: >>", "append: — dictated with Chirp").
+paste_mode = "ctrl"                             # Non-Windows platforms honor this: "ctrl" -> Ctrl+V, "ctrl+shift" -> Ctrl+Shift+V. Windows types text directly today.
+clipboard_behavior = true                       # Keeps clipboard history clean when true by clearing it after `clipboard_clear_delay` seconds.
+clipboard_clear_delay = 0.75                    # Seconds to wait before clearing the clipboard (only if `clipboard_behavior` is true).
+audio_feedback = true                           # Enables start/stop chime playback.
+start_sound_path = ""                           # Leave blank to use bundled asset; default: src/chirp/assets/ping-up.wav
+stop_sound_path = ""                            # Leave blank to use bundled asset; default: src/chirp/assets/ping-down.wav
+
+# Word overrides map spoken tokens (case-insensitive) to replacement text.
+[word_overrides]
+parrakeat = "parakeet"
+"parra keat" = "parakeet"  
+```
 
 ## Removal
 - Delete the cloned `chirp` directory.
