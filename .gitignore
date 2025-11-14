@@ -182,9 +182,9 @@ data/
 *.wav
 *.mp3
 *.flac
-*.ogg
 *.m4a
 !src/chirp/assets/*.wav
+!src/chirp/assets/*.ogg
 
 # Configuration and user data
 user_data/
