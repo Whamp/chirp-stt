@@ -138,9 +138,13 @@ class TextInjector:
         return re.compile(pattern, flags=re.IGNORECASE)
 
 
+_RE_COMBINE_WHITESPACE = re.compile(r"\s+")
+_RE_STRIP_WHITESPACE_BEFORE_PUNCTUATION = re.compile(r"\s+([,.;!?])")
+
+
 def _normalize_punctuation(text: str) -> str:
-    text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"\s+([,.;!?])", r"\1", text)
+    text = _RE_COMBINE_WHITESPACE.sub(" ", text)
+    text = _RE_STRIP_WHITESPACE_BEFORE_PUNCTUATION.sub(r"\1", text)
     text = text.replace(" ,", ",").replace(" .", ".")
     return text.strip()
 
