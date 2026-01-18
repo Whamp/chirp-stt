@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import gc
 import logging
+import threading
+import time
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -31,6 +34,7 @@ class ParakeetManager:
         threads: Optional[int],
         logger: logging.Logger,
         model_dir: Path,
+        timeout: float = 300.0,
     ) -> None:
         self._logger = logger
         self._model_name = model_name
@@ -38,7 +42,33 @@ class ParakeetManager:
         self._providers = self._resolve_providers(provider_key)
         self._session_options = self._build_session_options(threads)
         self._model_dir = model_dir
+        self._timeout = timeout
+        self._last_access = time.time()
+        self._lock = threading.Lock()
         self._model = self._load_model()
+        self._stop_monitor = threading.Event()
+        self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self._monitor_thread.start()
+
+    def _monitor_loop(self) -> None:
+        while not self._stop_monitor.is_set():
+            time.sleep(5)
+            if self._model is not None and (time.time() - self._last_access > self._timeout):
+                self._unload_model()
+
+    def _unload_model(self) -> None:
+        with self._lock:
+            if self._model is not None and (time.time() - self._last_access > self._timeout):
+                self._logger.info("Unloading Parakeet model to free memory.")
+                self._model = None
+                gc.collect()
+
+    def ensure_loaded(self):
+        with self._lock:
+            if self._model is None:
+                self._logger.info("Reloading Parakeet model...")
+                self._model = self._load_model()
+            return self._model
 
     def _resolve_providers(self, key: str) -> Sequence[str]:
         normalized = key.lower()
@@ -86,10 +116,12 @@ class ParakeetManager:
             ) from exc
 
     def transcribe(self, audio: np.ndarray, *, sample_rate: int = 16_000, language: Optional[str] = None) -> str:
+        self._last_access = time.time()
+        model = self.ensure_loaded()
         if audio.ndim > 1:
             audio = audio.reshape(-1)
         waveform = audio.astype(np.float32, copy=False)
         if waveform.size == 0:
             return ""
-        result = self._model.recognize(waveform, sample_rate=sample_rate, language=language)
+        result = model.recognize(waveform, sample_rate=sample_rate, language=language)
         return result if isinstance(result, str) else str(result)

@@ -52,6 +52,7 @@ class ChirpApp:
                 threads=self.config.threads,
                 logger=self.logger,
                 model_dir=model_dir,
+                timeout=self.config.model_timeout,
             )
         except ModelNotPreparedError as exc:
             self.logger.error(str(exc))
@@ -182,6 +183,7 @@ def _run_smoke_check(*, verbose: bool = False) -> None:
             threads=config.threads,
             logger=logger,
             model_dir=model_dir,
+            timeout=config.model_timeout,
         )
     except ModelNotPreparedError as exc:
         logger.error(str(exc))
