@@ -57,7 +57,9 @@ class ParakeetManager:
             return None
         options = ort.SessionOptions()
         options.intra_op_num_threads = threads
-        options.inter_op_num_threads = threads
+        # For sequential models like Parakeet (CTC), inter-op parallelism adds overhead.
+        # Force to 1 to minimize thread contention when threads are pinned.
+        options.inter_op_num_threads = 1
         return options
 
     def _load_model(self):
