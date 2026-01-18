@@ -13,9 +13,6 @@ import pyperclip
 from .keyboard_shortcuts import KeyboardShortcutManager
 
 
-MAX_INJECTION_LENGTH = 2000
-
-
 @dataclass(slots=True)
 class StyleGuide:
     sentence_case: bool = False
@@ -91,13 +88,6 @@ class TextInjector:
 
         if not result:
             return result
-
-        # Limit length to prevent DoS (flooding the application with keystrokes)
-        if len(result) > MAX_INJECTION_LENGTH:
-            self._logger.warning(
-                "Transcription truncated (length %d > %d)", len(result), MAX_INJECTION_LENGTH
-            )
-            result = result[:MAX_INJECTION_LENGTH]
 
         result = self._apply_word_overrides(result)
         result = _normalize_punctuation(result)

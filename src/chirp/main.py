@@ -69,6 +69,7 @@ class ChirpApp:
 
         self._recording = False
         self._lock = threading.Lock()
+        self._stop_timer: Optional[threading.Timer] = None
 
     def run(self) -> None:
         try:
@@ -104,7 +105,21 @@ class ChirpApp:
         self.audio_feedback.play_start(self.config.start_sound_path)
         self.logger.info("Recording started")
 
+        if self.config.max_recording_duration > 0:
+            self._stop_timer = threading.Timer(
+                self.config.max_recording_duration, self._handle_timeout
+            )
+            self._stop_timer.start()
+
+    def _handle_timeout(self) -> None:
+        self.logger.info("Maximum recording duration reached.")
+        self.toggle_recording()
+
     def _stop_recording(self) -> None:
+        if self._stop_timer:
+            self._stop_timer.cancel()
+            self._stop_timer = None
+
         self.logger.debug("Stopping audio capture")
         waveform = self.audio_capture.stop()
         self._recording = False
