@@ -91,5 +91,9 @@ class ConfigManager:
 
     def model_dir(self, model_name: str, quantization: Optional[str]) -> Path:
         suffix = "-int8" if (quantization or "").lower() == "int8" else ""
-        safe = re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-") or "model"
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-")
+        # Collapse multiple dots to prevent path traversal
+        safe = re.sub(r"\.+", ".", safe)
+        if not safe or safe == ".":
+            safe = "model"
         return self._models_root / f"{safe}{suffix}"
