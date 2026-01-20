@@ -98,6 +98,7 @@ class ChirpApp:
             self.audio_capture.start()
         except Exception as exc:
             self.logger.error("Audio capture start failed: %s", exc)
+            self.audio_feedback.play_error(self.config.error_sound_path)
             return
         self._recording = True
         self.audio_feedback.play_start(self.config.start_sound_path)
@@ -120,11 +121,13 @@ class ChirpApp:
             text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
         except Exception as exc:
             self.logger.exception("Transcription failed: %s", exc)
+            self.audio_feedback.play_error(self.config.error_sound_path)
             return
         duration = time.perf_counter() - start_time
         self.logger.debug("Transcription finished in %.2fs (chars=%s)", duration, len(text))
         if not text.strip():
             self.logger.info("Transcription empty; skipping paste")
+            self.audio_feedback.play_error(self.config.error_sound_path)
             return
         self.logger.info("Transcription: %s", text)
         self.text_injector.inject(text)

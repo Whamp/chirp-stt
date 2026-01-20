@@ -25,6 +25,20 @@ class AudioFeedback:
     def play_stop(self, override_path: Optional[str] = None) -> None:
         self._play_sound("ping-down.wav", override_path)
 
+    def play_error(self, override_path: Optional[str] = None) -> None:
+        if not self._enabled:
+            return
+
+        if override_path:
+            self._play_sound("ping-down.wav", override_path)
+            return
+
+        if winsound:
+            try:
+                winsound.MessageBeep(winsound.MB_ICONHAND)  # type: ignore[union-attr]
+            except Exception as exc:
+                self._logger.warning("Failed to play error beep: %s", exc)
+
     def _play_sound(self, asset_name: str, override_path: Optional[str]) -> None:
         if not self._enabled:
             if winsound is None and platform.system() != "Windows":

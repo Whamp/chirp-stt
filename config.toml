@@ -12,6 +12,7 @@ clipboard_clear_delay = 0.75                    # Seconds to wait before clearin
 audio_feedback = true                           # Enables start/stop chime playback.
 start_sound_path = ""                           # Leave blank to use bundled asset; default: src/chirp/assets/ping-up.wav
 stop_sound_path = ""                            # Leave blank to use bundled asset; default: src/chirp/assets/ping-down.wav
+error_sound_path = ""                           # Leave blank to use system error beep; set path to override.
 
 # Word overrides map spoken tokens (case-insensitive) to replacement text.
 [word_overrides]
