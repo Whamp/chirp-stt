@@ -57,7 +57,9 @@ class ParakeetManager:
             return None
         options = ort.SessionOptions()
         options.intra_op_num_threads = threads
-        options.inter_op_num_threads = threads
+        # Force inter-op threads to 1 for sequential execution (Parakeet V3)
+        # Setting this > 1 adds overhead without benefit for batch_size=1 inference
+        options.inter_op_num_threads = 1
         return options
 
     def _load_model(self):
