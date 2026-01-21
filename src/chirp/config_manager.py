@@ -63,6 +63,30 @@ class ChirpConfig:
         payload["word_overrides"] = dict(self.word_overrides)
         return payload
 
+    def validate(self) -> None:
+        if self.threads is not None and self.threads < 0:
+            raise ValueError(f"threads must be non-negative, got {self.threads}")
+
+        if self.clipboard_clear_delay <= 0:
+            raise ValueError(
+                f"clipboard_clear_delay must be positive, got {self.clipboard_clear_delay}"
+            )
+
+        if self.paste_mode not in ("ctrl", "ctrl+shift"):
+            raise ValueError(
+                f"paste_mode must be 'ctrl' or 'ctrl+shift', got {self.paste_mode!r}"
+            )
+
+        if self.start_sound_path:
+            path = Path(self.start_sound_path)
+            if not path.is_file():
+                raise ValueError(f"start_sound_path does not exist: {path}")
+
+        if self.stop_sound_path:
+            path = Path(self.stop_sound_path)
+            if not path.is_file():
+                raise ValueError(f"stop_sound_path does not exist: {path}")
+
 
 class ConfigManager:
     def __init__(self) -> None:
@@ -86,7 +110,9 @@ class ConfigManager:
         self.ensure_exists()
         with self._config_path.open("rb") as handle:
             data = tomllib.load(handle)
-        return ChirpConfig.from_dict(data)
+        config = ChirpConfig.from_dict(data)
+        config.validate()
+        return config
 
     def save(self, config: ChirpConfig) -> None:
         raise NotImplementedError("Saving config.toml is not supported; edit the file manually.")
