@@ -30,6 +30,7 @@ class ChirpConfig:
     audio_feedback: bool = True
     start_sound_path: Optional[str] = None
     stop_sound_path: Optional[str] = None
+    error_sound_path: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ChirpConfig":
@@ -87,9 +88,13 @@ class ConfigManager:
         return ChirpConfig.from_dict(data)
 
     def save(self, config: ChirpConfig) -> None:
-        raise NotImplementedError("Saving config.toml is not supported; edit the file manually.")
+        raise NotImplementedError(
+            "Saving config.toml is not supported; edit the file manually."
+        )
 
     def model_dir(self, model_name: str, quantization: Optional[str]) -> Path:
         suffix = "-int8" if (quantization or "").lower() == "int8" else ""
-        safe = re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-") or "model"
+        safe = (
+            re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-") or "model"
+        )
         return self._models_root / f"{safe}{suffix}"
