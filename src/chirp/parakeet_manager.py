@@ -50,14 +50,18 @@ class ParakeetManager:
         return CPU_PROVIDERS
 
     def _build_session_options(self, threads: Optional[int]):
-        if not threads or threads < 1:
-            return None
         if ort is None:
-            self._logger.warning("onnxruntime not available; ignoring threads=%s", threads)
+            if threads and threads > 0:
+                self._logger.warning("onnxruntime not available; ignoring threads=%s", threads)
             return None
+
         options = ort.SessionOptions()
-        options.intra_op_num_threads = threads
-        options.inter_op_num_threads = threads
+        # Optimization: Force inter_op_num_threads to 1.
+        # This minimizes overhead for sequential models like Parakeet.
+        options.inter_op_num_threads = 1
+
+        if threads and threads > 0:
+            options.intra_op_num_threads = threads
         return options
 
     def _load_model(self):
