@@ -77,6 +77,14 @@ class ChirpConfig:
                 f"paste_mode must be 'ctrl' or 'ctrl+shift', got {self.paste_mode!r}"
             )
 
+        if self.model_timeout < 0:
+            raise ValueError(f"model_timeout must be non-negative, got {self.model_timeout}")
+
+        if self.max_recording_duration < 0:
+            raise ValueError(
+                f"max_recording_duration must be non-negative, got {self.max_recording_duration}"
+            )
+
         if self.start_sound_path:
             path = Path(self.start_sound_path)
             if not path.is_file():
