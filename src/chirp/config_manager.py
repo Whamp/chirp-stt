@@ -91,5 +91,13 @@ class ConfigManager:
 
     def model_dir(self, model_name: str, quantization: Optional[str]) -> Path:
         suffix = "-int8" if (quantization or "").lower() == "int8" else ""
-        safe = re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-") or "model"
-        return self._models_root / f"{safe}{suffix}"
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "-", model_name.lower()).strip("-")
+        # Collapse multiple dots to prevent path traversal
+        safe = re.sub(r"\.+", ".", safe).strip(".")
+        if not safe:
+            safe = "model"
+        result = (self._models_root / f"{safe}{suffix}").resolve()
+        # Final guard: ensure resolved path is within models_root
+        if not result.is_relative_to(self._models_root.resolve()):
+            raise ValueError(f"Invalid model name: {model_name!r} escapes models directory")
+        return result
