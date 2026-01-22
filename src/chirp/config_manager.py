@@ -31,6 +31,7 @@ class ChirpConfig:
     audio_feedback: bool = True
     start_sound_path: Optional[str] = None
     stop_sound_path: Optional[str] = None
+    error_sound_path: Optional[str] = None
     max_recording_duration: float = 45.0
 
     @classmethod
