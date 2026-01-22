@@ -1,33 +1,51 @@
 import unittest
 from pathlib import Path
-from src.chirp.config_manager import ConfigManager
+from chirp.config_manager import ConfigManager
+
 
 class TestSecurity(unittest.TestCase):
-    def test_model_dir_path_traversal(self):
-        """Verify that model_dir prevents path traversal."""
-        # Mock ConfigManager to avoid file system dependency on config.toml
-        # We only need _models_root for this test
-        cm = ConfigManager()
-        # Ensure we don't try to load config.toml which might not exist or fail
-        cm._config_path = Path("/tmp/nonexistent_config.toml")
-        cm._models_root = Path("/tmp/models")
+    def setUp(self):
+        """Set up a ConfigManager with a mock models_root."""
+        self.cm = ConfigManager()
+        self.cm._config_path = Path("/tmp/nonexistent_config.toml")
+        self.cm._models_root = Path("/tmp/models")
 
-        # Test case: ".."
-        path = cm.model_dir("..", None)
-        # Should resolve to "model" inside models_root
-        expected = cm.models_root / "model"
-        self.assertEqual(path, expected, "Traveral via '..' failed")
-
-        # Test case: "my..model"
-        path = cm.model_dir("my..model", None)
-        # Should resolve to "my.model"
-        expected = cm.models_root / "my.model"
-        self.assertEqual(path, expected, "Dots were not collapsed")
-
-        # Test case: "safe"
-        path = cm.model_dir("safe", None)
-        expected = cm.models_root / "safe"
+    def test_model_dir_double_dot_traversal(self):
+        """Verify that '..' resolves to safe 'model' fallback."""
+        path = self.cm.model_dir("..", None)
+        expected = self.cm.models_root.resolve() / "model"
         self.assertEqual(path, expected)
 
-if __name__ == '__main__':
+    def test_model_dir_collapses_multiple_dots(self):
+        """Verify that 'my..model' collapses to 'my.model'."""
+        path = self.cm.model_dir("my..model", None)
+        expected = self.cm.models_root.resolve() / "my.model"
+        self.assertEqual(path, expected)
+
+    def test_model_dir_safe_name(self):
+        """Verify that a safe name works correctly."""
+        path = self.cm.model_dir("safe", None)
+        expected = self.cm.models_root.resolve() / "safe"
+        self.assertEqual(path, expected)
+
+    def test_model_dir_with_quantization(self):
+        """Verify that int8 suffix is appended correctly."""
+        path = self.cm.model_dir("mymodel", "int8")
+        expected = self.cm.models_root.resolve() / "mymodel-int8"
+        self.assertEqual(path, expected)
+
+    def test_model_dir_empty_falls_back(self):
+        """Verify that empty/whitespace model names fall back to 'model'."""
+        path = self.cm.model_dir("", None)
+        expected = self.cm.models_root.resolve() / "model"
+        self.assertEqual(path, expected)
+
+    def test_model_dir_dots_only_falls_back(self):
+        """Verify that '...' falls back to 'model'."""
+        path = self.cm.model_dir("...", None)
+        expected = self.cm.models_root.resolve() / "model"
+        self.assertEqual(path, expected)
+
+
+if __name__ == "__main__":
     unittest.main()
