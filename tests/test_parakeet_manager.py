@@ -1,29 +1,26 @@
-import sys
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-import time
 
-# Add src to path
-SRC_DIR = Path(__file__).resolve().parents[1] / "src"
-sys.path.append(str(SRC_DIR))
+import numpy as np
 
 from chirp.parakeet_manager import ParakeetManager
+
 
 class TestParakeetManager(unittest.TestCase):
     def setUp(self):
         self.logger = MagicMock()
-        self.model_dir = Path("dummy_model_dir")
+        self.model_dir = Path("/tmp/dummy_model_dir")
 
     @patch("chirp.parakeet_manager.onnx_asr")
     @patch("chirp.parakeet_manager.time.time")
     def test_lifecycle(self, mock_time, mock_onnx):
-        # Setup mock model
+        """Test model load, unload, and reload lifecycle."""
         mock_model_instance = MagicMock()
         mock_onnx.load_model.return_value = mock_model_instance
         mock_time.return_value = 1000.0
 
-        # Initialize manager
         manager = ParakeetManager(
             model_name="test",
             quantization=None,
@@ -31,7 +28,7 @@ class TestParakeetManager(unittest.TestCase):
             threads=1,
             logger=self.logger,
             model_dir=self.model_dir,
-            timeout=100.0
+            timeout=100.0,
         )
 
         # 1. Verify model is loaded on init
@@ -51,16 +48,15 @@ class TestParakeetManager(unittest.TestCase):
 
         # 4. Cleanup
         manager._stop_monitor.set()
-        # Wait a bit for thread to likely exit (not strictly necessary as it's daemon, but cleaner)
-        time.sleep(0.1)
+        time.sleep(0.05)
 
     @patch("chirp.parakeet_manager.onnx_asr")
     @patch("chirp.parakeet_manager.time.time")
     def test_transcribe_reloads_and_updates_time(self, mock_time, mock_onnx):
+        """Test that transcribe reloads model if unloaded and updates last_access."""
         mock_model_instance = MagicMock()
         mock_model_instance.recognize.return_value = "hello"
         mock_onnx.load_model.return_value = mock_model_instance
-
         mock_time.return_value = 1000.0
 
         manager = ParakeetManager(
@@ -70,10 +66,9 @@ class TestParakeetManager(unittest.TestCase):
             threads=1,
             logger=self.logger,
             model_dir=self.model_dir,
-            timeout=100.0
+            timeout=100.0,
         )
 
-        # Verify initial last_access
         self.assertEqual(manager._last_access, 1000.0)
 
         # Unload (simulate timeout)
@@ -81,20 +76,37 @@ class TestParakeetManager(unittest.TestCase):
         manager._unload_model()
         self.assertIsNone(manager._model)
 
-        # Transcribe
-        import numpy as np
+        # Transcribe should reload
         audio = np.zeros(16000, dtype=np.float32)
-
         mock_time.return_value = 2000.0
-        manager.transcribe(audio)
+        result = manager.transcribe(audio)
 
-        # Verify reloaded
+        self.assertEqual(result, "hello")
         self.assertIsNotNone(manager._model)
-        # Verify last_access updated
         self.assertEqual(manager._last_access, 2000.0)
 
         manager._stop_monitor.set()
-        time.sleep(0.1)
+        time.sleep(0.05)
+
+    @patch("chirp.parakeet_manager.onnx_asr")
+    def test_timeout_zero_disables_monitor(self, mock_onnx):
+        """Test that timeout=0 disables the monitor thread."""
+        mock_onnx.load_model.return_value = MagicMock()
+
+        manager = ParakeetManager(
+            model_name="test",
+            quantization=None,
+            provider_key="cpu",
+            threads=1,
+            logger=self.logger,
+            model_dir=self.model_dir,
+            timeout=0,
+        )
+
+        # Monitor thread should not be started
+        self.assertIsNone(manager._monitor_thread)
+        self.assertIsNotNone(manager._model)
+
 
 if __name__ == "__main__":
     unittest.main()

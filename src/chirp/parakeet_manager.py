@@ -42,18 +42,26 @@ class ParakeetManager:
         self._providers = self._resolve_providers(provider_key)
         self._session_options = self._build_session_options(threads)
         self._model_dir = model_dir
-        self._timeout = timeout
+        self._timeout = timeout  # 0 or negative means never unload
         self._last_access = time.time()
         self._lock = threading.Lock()
         self._model = self._load_model()
         self._stop_monitor = threading.Event()
-        self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
-        self._monitor_thread.start()
+        self._monitor_thread: Optional[threading.Thread] = None
+        if self._timeout > 0:
+            self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+            self._monitor_thread.start()
 
     def _monitor_loop(self) -> None:
         while not self._stop_monitor.is_set():
             time.sleep(5)
-            if self._model is not None and (time.time() - self._last_access > self._timeout):
+            with self._lock:
+                should_unload = (
+                    self._model is not None
+                    and self._timeout > 0
+                    and (time.time() - self._last_access > self._timeout)
+                )
+            if should_unload:
                 self._unload_model()
 
     def _unload_model(self) -> None:
@@ -116,7 +124,8 @@ class ParakeetManager:
             ) from exc
 
     def transcribe(self, audio: np.ndarray, *, sample_rate: int = 16_000, language: Optional[str] = None) -> str:
-        self._last_access = time.time()
+        with self._lock:
+            self._last_access = time.time()
         model = self.ensure_loaded()
         if audio.ndim > 1:
             audio = audio.reshape(-1)
