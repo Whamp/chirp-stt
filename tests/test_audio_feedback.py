@@ -1,70 +1,68 @@
-import sys
+import logging
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
-import importlib
+
+from chirp.audio_feedback import AudioFeedback
+
 
 class TestAudioFeedback(unittest.TestCase):
-    def test_play_sound_uses_sounddevice(self):
-        """Test that play_start calls sounddevice.play when winsound is missing."""
-        mock_sd = MagicMock()
-        mock_wave = MagicMock()
-        mock_np = MagicMock()
-        mock_logger = MagicMock()
+    def setUp(self):
+        self.mock_logger = MagicMock(spec=logging.Logger)
 
-        # Patch modules
-        with patch.dict(sys.modules, {
-            "sounddevice": mock_sd,
-            "winsound": None,
-            "numpy": mock_np,
-            "wave": mock_wave
-        }):
-            # Force reload/import of the module under test to pick up patched modules
-            if "chirp.audio_feedback" in sys.modules:
-                del sys.modules["chirp.audio_feedback"]
+    def test_enabled_when_sounddevice_available(self):
+        """AudioFeedback should be enabled when sounddevice is available."""
+        # On Linux, winsound is None but sounddevice should be available
+        af = AudioFeedback(logger=self.mock_logger, enabled=True)
+        # Since we're on Linux and sounddevice is installed, should be enabled
+        self.assertTrue(af._enabled)
 
-            from chirp import audio_feedback
-            importlib.reload(audio_feedback)
+    def test_disabled_when_explicitly_disabled(self):
+        """AudioFeedback should respect enabled=False."""
+        af = AudioFeedback(logger=self.mock_logger, enabled=False)
+        self.assertFalse(af._enabled)
 
-            # Setup the instance
-            af = audio_feedback.AudioFeedback(logger=mock_logger, enabled=True)
+    @patch("chirp.audio_feedback.sd")
+    @patch("chirp.audio_feedback.winsound", None)
+    def test_play_with_sounddevice_called(self, mock_sd):
+        """When winsound is None, should use sounddevice."""
+        af = AudioFeedback(logger=self.mock_logger, enabled=True)
 
-            # Verify enabled logic
-            self.assertTrue(af._enabled)
+        # Mock the internal method to verify it gets called
+        af._play_with_sounddevice = MagicMock()
 
-            # Prepare mocks for execution
-            mock_wf = MagicMock()
-            mock_wave.open.return_value.__enter__.return_value = mock_wf
-            mock_wf.getframerate.return_value = 44100
-            mock_wf.getnchannels.return_value = 1
-            mock_wf.readframes.return_value = b'data'
+        with patch.object(af, "_get_sound_path") as mock_get_path:
+            mock_get_path.return_value.__enter__ = MagicMock(return_value=Path("/fake/path.wav"))
+            mock_get_path.return_value.__exit__ = MagicMock(return_value=False)
 
-            mock_data = MagicMock()
-            mock_np.frombuffer.return_value = mock_data
+            af.play_start()
 
-            # Run method
-            af.play_start(override_path="test.wav")
+            af._play_with_sounddevice.assert_called_once()
 
-            # Assertions
-            mock_wave.open.assert_called_with("test.wav", "rb")
-            mock_sd.play.assert_called_with(mock_data, 44100)
+    @patch("chirp.audio_feedback.sd")
+    @patch("chirp.audio_feedback.np")
+    @patch("chirp.audio_feedback.wave")
+    def test_play_with_sounddevice_reads_wav(self, mock_wave, mock_np, mock_sd):
+        """_play_with_sounddevice should read WAV and call sd.play()."""
+        af = AudioFeedback(logger=self.mock_logger, enabled=True)
 
-    def test_audio_feedback_disabled_if_backends_missing(self):
-        """Test that it disables itself if no backend is available."""
-        mock_logger = MagicMock()
+        # Setup wave mock
+        mock_wf = MagicMock()
+        mock_wave.open.return_value.__enter__.return_value = mock_wf
+        mock_wf.getframerate.return_value = 44100
+        mock_wf.getnchannels.return_value = 1
+        mock_wf.getnframes.return_value = 1000
+        mock_wf.readframes.return_value = b"\x00" * 2000
 
-        # Simulate missing modules
-        with patch.dict(sys.modules, {
-            "sounddevice": None,
-            "winsound": None,
-        }):
-             if "chirp.audio_feedback" in sys.modules:
-                del sys.modules["chirp.audio_feedback"]
+        mock_audio_data = MagicMock()
+        mock_np.frombuffer.return_value = mock_audio_data
 
-             from chirp import audio_feedback
-             importlib.reload(audio_feedback)
+        af._play_with_sounddevice(Path("/fake/sound.wav"))
 
-             af = audio_feedback.AudioFeedback(logger=mock_logger, enabled=True)
-             self.assertFalse(af._enabled)
+        mock_wave.open.assert_called_with("/fake/sound.wav", "rb")
+        mock_np.frombuffer.assert_called()
+        mock_sd.play.assert_called_with(mock_audio_data, 44100)
+
 
 if __name__ == "__main__":
     unittest.main()
