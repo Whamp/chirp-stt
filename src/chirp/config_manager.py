@@ -96,6 +96,11 @@ class ChirpConfig:
             if not path.is_file():
                 raise ValueError(f"stop_sound_path does not exist: {path}")
 
+        if self.error_sound_path:
+            path = Path(self.error_sound_path)
+            if not path.is_file():
+                raise ValueError(f"error_sound_path does not exist: {path}")
+
 
 class ConfigManager:
     def __init__(self) -> None:

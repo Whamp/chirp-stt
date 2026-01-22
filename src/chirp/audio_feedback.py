@@ -42,20 +42,30 @@ class AudioFeedback:
         self._play_sound("ping-down.wav", override_path)
 
     def play_error(self, override_path: Optional[str] = None) -> None:
+        """Play error sound. Uses custom path, or falls back to system beep."""
         if not self._enabled:
             return
 
+        # Try custom sound file first
         if override_path:
             try:
-                winsound.PlaySound(override_path, winsound.SND_FILENAME | winsound.SND_ASYNC)  # type: ignore[union-attr]
+                if winsound is not None:
+                    winsound.PlaySound(override_path, winsound.SND_FILENAME | winsound.SND_ASYNC)  # type: ignore[union-attr]
+                elif sd is not None:
+                    self._play_with_sounddevice(Path(override_path))
                 return
             except Exception:
                 self._logger.warning("Error sound file failed: %s. Falling back to system beep.", override_path)
 
-        try:
-            winsound.MessageBeep(winsound.MB_ICONHAND)  # type: ignore[union-attr]
-        except Exception as exc:
-            self._logger.exception("Failed to play error beep: %s", exc)
+        # Fall back to system beep
+        if winsound is not None:
+            try:
+                winsound.MessageBeep(winsound.MB_ICONHAND)  # type: ignore[union-attr]
+            except Exception as exc:
+                self._logger.exception("Failed to play error beep: %s", exc)
+        else:
+            # No system beep on non-Windows, just log
+            self._logger.debug("No error sound available (no winsound, no custom path)")
 
     def _play_sound(self, asset_name: str, override_path: Optional[str]) -> None:
         if not self._enabled:
