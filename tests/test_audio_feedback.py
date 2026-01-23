@@ -10,6 +10,8 @@ class TestAudioFeedback(unittest.TestCase):
     def setUp(self):
         self.mock_logger = MagicMock(spec=logging.Logger)
 
+    @patch("chirp.audio_feedback.sd", new=MagicMock())
+    @patch("chirp.audio_feedback.winsound", None)
     def test_enabled_when_sounddevice_available(self):
         """AudioFeedback should be enabled when sounddevice is available."""
         # On Linux, winsound is None but sounddevice should be available
@@ -25,11 +27,12 @@ class TestAudioFeedback(unittest.TestCase):
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.winsound", None)
     def test_play_with_sounddevice_called(self, mock_sd):
-        """When winsound is None, should use sounddevice."""
+        """When winsound is None, should use sounddevice path (via cache)."""
         af = AudioFeedback(logger=self.mock_logger, enabled=True)
 
-        # Mock the internal method to verify it gets called
-        af._play_with_sounddevice = MagicMock()
+        # Mock the internal methods
+        af._load_and_cache = MagicMock(return_value="data")
+        af._play_cached = MagicMock()
 
         with patch.object(af, "_get_sound_path") as mock_get_path:
             mock_get_path.return_value.__enter__ = MagicMock(return_value=Path("/fake/path.wav"))
@@ -37,13 +40,14 @@ class TestAudioFeedback(unittest.TestCase):
 
             af.play_start()
 
-            af._play_with_sounddevice.assert_called_once()
+            af._load_and_cache.assert_called_once()
+            af._play_cached.assert_called_once_with("data")
 
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.np")
     @patch("chirp.audio_feedback.wave")
-    def test_play_with_sounddevice_reads_wav(self, mock_wave, mock_np, mock_sd):
-        """_play_with_sounddevice should read WAV and call sd.play()."""
+    def test_load_and_cache_sounddevice(self, mock_wave, mock_np, mock_sd):
+        """_load_and_cache should read WAV and cache data."""
         af = AudioFeedback(logger=self.mock_logger, enabled=True)
 
         # Setup wave mock
@@ -57,11 +61,25 @@ class TestAudioFeedback(unittest.TestCase):
         mock_audio_data = MagicMock()
         mock_np.frombuffer.return_value = mock_audio_data
 
-        af._play_with_sounddevice(Path("/fake/sound.wav"))
+        key = "test_key"
+        data = af._load_and_cache(Path("/fake/sound.wav"), key)
 
         mock_wave.open.assert_called_with("/fake/sound.wav", "rb")
         mock_np.frombuffer.assert_called()
-        mock_sd.play.assert_called_with(mock_audio_data, 44100)
+
+        # Check returned data and cache
+        expected = (mock_audio_data, 44100)
+        self.assertEqual(data, expected)
+        self.assertEqual(af._cache[key], expected)
+
+    @patch("chirp.audio_feedback.sd")
+    @patch("chirp.audio_feedback.winsound", None)
+    def test_play_cached_sounddevice(self, mock_sd):
+        """_play_cached should call sd.play."""
+        af = AudioFeedback(logger=self.mock_logger, enabled=True)
+        mock_data = (MagicMock(), 44100)
+        af._play_cached(mock_data)
+        mock_sd.play.assert_called_with(mock_data[0], 44100)
 
 
 if __name__ == "__main__":
