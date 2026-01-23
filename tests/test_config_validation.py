@@ -56,6 +56,24 @@ class TestConfigValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stop_sound_path does not exist"):
             conf.validate()
 
+    def test_validate_audio_feedback_volume_below_zero(self):
+        """Negative audio_feedback_volume should fail validation."""
+        conf = ChirpConfig(audio_feedback_volume=-0.1)
+        with self.assertRaisesRegex(ValueError, "audio_feedback_volume must be between 0.0 and 1.0"):
+            conf.validate()
+
+    def test_validate_audio_feedback_volume_above_one(self):
+        """audio_feedback_volume above 1.0 should fail validation."""
+        conf = ChirpConfig(audio_feedback_volume=1.5)
+        with self.assertRaisesRegex(ValueError, "audio_feedback_volume must be between 0.0 and 1.0"):
+            conf.validate()
+
+    def test_validate_audio_feedback_volume_valid_range(self):
+        """audio_feedback_volume within 0.0-1.0 should pass validation."""
+        for vol in [0.0, 0.5, 1.0]:
+            conf = ChirpConfig(audio_feedback_volume=vol)
+            conf.validate()  # Should not raise
+
     def test_valid_default_config(self):
         """Default config should pass validation."""
         conf = ChirpConfig()

@@ -47,7 +47,11 @@ class ChirpApp:
 
         self.keyboard = KeyboardShortcutManager(logger=self.logger)
         self.audio_capture = AudioCapture(status_callback=self._log_capture_status)
-        self.audio_feedback = AudioFeedback(logger=self.logger, enabled=self.config.audio_feedback)
+        self.audio_feedback = AudioFeedback(
+            logger=self.logger,
+            enabled=self.config.audio_feedback,
+            volume=self.config.audio_feedback_volume,
+        )
 
         console = None
         for handler in self.logger.handlers:

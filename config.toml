@@ -1,7 +1,7 @@
 primary_shortcut = "ctrl+shift"                 # Hotkey that toggles recording; any combination supported by the `keyboard` library works (e.g. "ctrl+shift+space").
 stt_backend = "parakeet"                        # Only "parakeet" is bundled today, but keeping this key lets us add more backends later if needed.
 parakeet_model = "nemo-parakeet-tdt-0.6b-v3"    # Deployed ONNX bundle name; keep as-is unless new models are added.
-parakeet_quantization = ""                      # Set to "int8" to download/use the quantized model variant; leave blank for default fp16.
+parakeet_quantization = "int8"                      # Set to "int8" to download/use the quantized model variant; leave blank for default fp16.
 onnx_providers = "cpu"                          # ONNX runtime provider string (comma- or pipe-separated if your build supports multiple providers, e.g. "cuda" or "cpu|dml").
 threads = 0                                     # 0 (or empty) lets ONNX decide; set a positive integer to pin thread usage.
 language = "en"                                 # Optional ISO language code; leave blank to let Parakeet auto-detect.
@@ -10,6 +10,7 @@ paste_mode = "ctrl"                             # Non-Windows platforms honor th
 clipboard_behavior = true                       # Keeps clipboard history clean when true by clearing it after `clipboard_clear_delay` seconds.
 clipboard_clear_delay = 0.75                    # Seconds to wait before clearing the clipboard (only if `clipboard_behavior` is true).
 audio_feedback = true                           # Enables start/stop chime playback.
+audio_feedback_volume = 1.0                     # Volume for audio feedback as a fraction of system volume (0.0 to 1.0). Requires sounddevice; winsound-only systems ignore this.
 start_sound_path = ""                           # Leave blank to use bundled asset; default: src/chirp/assets/ping-up.wav
 stop_sound_path = ""                            # Leave blank to use bundled asset; default: src/chirp/assets/ping-down.wav
 max_recording_duration = 45.0                   # Automatic stop recording after X seconds (default: 45s).

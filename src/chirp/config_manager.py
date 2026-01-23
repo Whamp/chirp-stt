@@ -31,6 +31,7 @@ class ChirpConfig:
     clipboard_clear_delay: float = 0.75
     model_timeout: float = 300.0
     audio_feedback: bool = True
+    audio_feedback_volume: float = 1.0
     start_sound_path: Optional[str] = None
     stop_sound_path: Optional[str] = None
     error_sound_path: Optional[str] = None
@@ -107,6 +108,11 @@ class ChirpConfig:
             path = Path(self.error_sound_path)
             if not path.is_file():
                 raise ValueError(f"error_sound_path does not exist: {path}")
+
+        if not (0.0 <= self.audio_feedback_volume <= 1.0):
+            raise ValueError(
+                f"audio_feedback_volume must be between 0.0 and 1.0, got {self.audio_feedback_volume}"
+            )
 
 
 class ConfigManager:

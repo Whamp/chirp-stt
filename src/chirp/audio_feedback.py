@@ -26,15 +26,48 @@ except ImportError:  # pragma: no cover - non-Windows development
 
 
 class AudioFeedback:
-    def __init__(self, *, logger: logging.Logger, enabled: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        logger: logging.Logger,
+        enabled: bool = True,
+        volume: float = 1.0,
+    ) -> None:
         self._logger = logger
-        # Enable if desired AND at least one backend is available
-        self._enabled = enabled and (winsound is not None or sd is not None)
+        self._volume = max(0.0, min(1.0, volume))  # Clamp to [0.0, 1.0]
         self._cache: Dict[str, Any] = {}
 
+        # Determine available backends
+        self._has_sounddevice = sd is not None and np is not None
+        self._has_winsound = winsound is not None
+
+        # Enable if desired AND at least one backend is available
+        self._enabled = enabled and (self._has_sounddevice or self._has_winsound)
+
+        # Prefer sounddevice when volume control is needed, otherwise prefer winsound on Windows
+        # (winsound is built-in and doesn't require PortAudio)
+        if self._volume < 1.0:
+            if self._has_sounddevice:
+                self._use_sounddevice = True
+            else:
+                self._use_sounddevice = False
+                self._logger.warning(
+                    "Volume control requires sounddevice; audio will play at system volume"
+                )
+        else:
+            # At full volume, prefer winsound on Windows for reliability
+            self._use_sounddevice = not self._has_winsound and self._has_sounddevice
+
         if self._enabled:
-            backend = "winsound" if winsound is not None else "sounddevice"
-            self._logger.debug("Audio feedback initialized using %s", backend)
+            backend = "sounddevice" if self._use_sounddevice else "winsound"
+            if self._volume < 1.0 and self._use_sounddevice:
+                self._logger.debug(
+                    "Audio feedback initialized using %s (volume=%.0f%%)",
+                    backend,
+                    self._volume * 100,
+                )
+            else:
+                self._logger.debug("Audio feedback initialized using %s", backend)
 
     def play_start(self, override_path: Optional[str] = None) -> None:
         self._play_sound("ping-up.wav", override_path)
@@ -58,7 +91,10 @@ class AudioFeedback:
                     self._play_cached(data)
                 return
             except Exception:
-                self._logger.warning("Error sound file failed: %s. Falling back to system beep.", override_path)
+                self._logger.warning(
+                    "Error sound file failed: %s. Falling back to system beep.",
+                    override_path,
+                )
 
         # Fall back to system beep
         if winsound is not None:
@@ -72,8 +108,11 @@ class AudioFeedback:
 
     def _play_sound(self, asset_name: str, override_path: Optional[str]) -> None:
         if not self._enabled:
-            if winsound is None and sd is None and platform.system() != "Windows":
-                self._logger.debug("Audio feedback disabled: no audio backend available on %s.", platform.system())
+            if not self._has_winsound and not self._has_sounddevice:
+                self._logger.debug(
+                    "Audio feedback disabled: no audio backend available on %s.",
+                    platform.system(),
+                )
             return
 
         cache_key = override_path or asset_name
@@ -91,28 +130,24 @@ class AudioFeedback:
             self._logger.exception("Failed to play sound %s: %s", asset_name, exc)
 
     def _load_and_cache(self, path: Path, key: str) -> Any:
-        if winsound is not None:
-            # Windows winsound: cache the file path (as string) for async playback
+        if self._use_sounddevice:
+            # Load as numpy array for volume-controlled playback via sounddevice
+            with wave.open(str(path), "rb") as wf:
+                samplerate = wf.getframerate()
+                channels = wf.getnchannels()
+                frames = wf.readframes(wf.getnframes())
+                # Convert buffer to numpy array
+                audio_data = np.frombuffer(frames, dtype=np.int16)
+                if channels > 1:
+                    audio_data = audio_data.reshape(-1, channels)
+
+                data = (audio_data, samplerate)
+                self._cache[key] = data
+                return data
+        else:
+            # winsound: cache the file path (as string) for async playback
             # SND_ASYNC does not work with SND_MEMORY, only with SND_FILENAME
             data = str(path.resolve())
-            self._cache[key] = data
-            return data
-
-        # Fallback to sounddevice
-        if np is None:
-            self._logger.error("numpy not available for sounddevice playback")
-            return None
-
-        with wave.open(str(path), 'rb') as wf:
-            samplerate = wf.getframerate()
-            channels = wf.getnchannels()
-            frames = wf.readframes(wf.getnframes())
-            # Convert buffer to numpy array
-            audio_data = np.frombuffer(frames, dtype=np.int16)
-            if channels > 1:
-                audio_data = audio_data.reshape(-1, channels)
-
-            data = (audio_data, samplerate)
             self._cache[key] = data
             return data
 
@@ -120,15 +155,25 @@ class AudioFeedback:
         if data is None:
             return
 
-        if winsound is not None:
-            # Windows: data is a file path string; use SND_FILENAME for async playback
-            winsound.PlaySound(data, winsound.SND_FILENAME | winsound.SND_ASYNC)  # type: ignore[union-attr]
-        elif sd is not None:
+        if self._use_sounddevice:
             audio_data, samplerate = data
-            sd.play(audio_data, samplerate)
+            # Apply volume scaling
+            if self._volume < 1.0:
+                # Convert to float32, scale, then back to int16 to avoid overflow
+                scaled = (audio_data.astype(np.float32) * self._volume).astype(np.int16)
+            else:
+                scaled = audio_data
+            sd.play(scaled, samplerate)
+        elif self._has_winsound:
+            # Windows: data is a file path string; use SND_FILENAME for async playback
+            winsound.PlaySound(
+                data, winsound.SND_FILENAME | winsound.SND_ASYNC
+            )  # type: ignore[union-attr]
 
     @contextmanager
-    def _get_sound_path(self, asset_name: str, override_path: Optional[str]) -> Iterator[Path]:
+    def _get_sound_path(
+        self, asset_name: str, override_path: Optional[str]
+    ) -> Iterator[Path]:
         if override_path:
             yield Path(override_path)
             return
