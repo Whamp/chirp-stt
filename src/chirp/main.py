@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import logging
 import platform
 import threading
@@ -70,6 +71,7 @@ class ChirpApp:
         self._recording = False
         self._lock = threading.Lock()
         self._stop_timer: Optional[threading.Timer] = None
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="Transcriber")
 
     def run(self) -> None:
         try:
@@ -126,7 +128,7 @@ class ChirpApp:
         self._recording = False
         self.audio_feedback.play_stop(self.config.stop_sound_path)
         self.logger.info("Recording stopped (%s samples)", waveform.size)
-        threading.Thread(target=self._transcribe_and_inject, args=(waveform,), daemon=True).start()
+        self._executor.submit(self._transcribe_and_inject, waveform)
 
     def _transcribe_and_inject(self, waveform) -> None:
         start_time = time.perf_counter()
