@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import platform
 import wave
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Dict, Iterator, Optional
 
 from importlib import resources
 
@@ -28,6 +28,8 @@ except ImportError:  # pragma: no cover - non-Windows development
 class AudioFeedback:
     def __init__(self, *, logger: logging.Logger, enabled: bool = True) -> None:
         self._logger = logger
+        self._exit_stack = ExitStack()
+        self._cached_paths: Dict[str, Path] = {}
         # Enable if desired AND at least one backend is available
         self._enabled = enabled and (winsound is not None or sd is not None)
 
@@ -105,6 +107,14 @@ class AudioFeedback:
         if override_path:
             yield Path(override_path)
             return
+
+        if asset_name in self._cached_paths:
+            yield self._cached_paths[asset_name]
+            return
+
         resource = resources.files("chirp.assets").joinpath(asset_name)
-        with resources.as_file(resource) as file_path:
-            yield file_path
+        # Use ExitStack to keep the file context alive for the lifetime of the application
+        # (or until AudioFeedback is destroyed, though we don't explicitly close it)
+        file_path = self._exit_stack.enter_context(resources.as_file(resource))
+        self._cached_paths[asset_name] = file_path
+        yield file_path

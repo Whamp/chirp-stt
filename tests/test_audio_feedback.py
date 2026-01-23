@@ -10,7 +10,8 @@ class TestAudioFeedback(unittest.TestCase):
     def setUp(self):
         self.mock_logger = MagicMock(spec=logging.Logger)
 
-    def test_enabled_when_sounddevice_available(self):
+    @patch("chirp.audio_feedback.sd", new_callable=MagicMock)
+    def test_enabled_when_sounddevice_available(self, mock_sd):
         """AudioFeedback should be enabled when sounddevice is available."""
         # On Linux, winsound is None but sounddevice should be available
         af = AudioFeedback(logger=self.mock_logger, enabled=True)
