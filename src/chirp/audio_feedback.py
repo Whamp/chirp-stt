@@ -92,8 +92,9 @@ class AudioFeedback:
 
     def _load_and_cache(self, path: Path, key: str) -> Any:
         if winsound is not None:
-            with open(path, "rb") as f:
-                data = f.read()
+            # Windows winsound: cache the file path (as string) for async playback
+            # SND_ASYNC does not work with SND_MEMORY, only with SND_FILENAME
+            data = str(path.resolve())
             self._cache[key] = data
             return data
 
@@ -120,8 +121,8 @@ class AudioFeedback:
             return
 
         if winsound is not None:
-            # winsound.SND_MEMORY = 0x0004
-            winsound.PlaySound(data, winsound.SND_MEMORY | winsound.SND_ASYNC)  # type: ignore[union-attr]
+            # Windows: data is a file path string; use SND_FILENAME for async playback
+            winsound.PlaySound(data, winsound.SND_FILENAME | winsound.SND_ASYNC)  # type: ignore[union-attr]
         elif sd is not None:
             audio_data, samplerate = data
             sd.play(audio_data, samplerate)
