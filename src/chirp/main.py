@@ -10,6 +10,9 @@ from typing import Optional, Sequence
 
 import numpy as np
 
+from rich.console import Console
+from rich.logging import RichHandler
+
 from .audio_capture import AudioCapture
 from .audio_feedback import AudioFeedback
 from .config_manager import ConfigManager
@@ -45,16 +48,26 @@ class ChirpApp:
         self.keyboard = KeyboardShortcutManager(logger=self.logger)
         self.audio_capture = AudioCapture(status_callback=self._log_capture_status)
         self.audio_feedback = AudioFeedback(logger=self.logger, enabled=self.config.audio_feedback)
+
+        console = None
+        for handler in self.logger.handlers:
+            if isinstance(handler, RichHandler):
+                console = handler.console
+                break
+        if not console:
+            console = Console(stderr=True)
+
         try:
-            self.parakeet = ParakeetManager(
-                model_name=self.config.parakeet_model,
-                quantization=self.config.parakeet_quantization,
-                provider_key=self.config.onnx_providers,
-                threads=self.config.threads,
-                logger=self.logger,
-                model_dir=model_dir,
-                timeout=self.config.model_timeout,
-            )
+            with console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
+                self.parakeet = ParakeetManager(
+                    model_name=self.config.parakeet_model,
+                    quantization=self.config.parakeet_quantization,
+                    provider_key=self.config.onnx_providers,
+                    threads=self.config.threads,
+                    logger=self.logger,
+                    model_dir=model_dir,
+                    timeout=self.config.model_timeout,
+                )
         except ModelNotPreparedError as exc:
             self.logger.error(str(exc))
             raise SystemExit(1) from exc
