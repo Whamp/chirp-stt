@@ -5,7 +5,7 @@ import platform
 import wave
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Any, Dict, Iterator, Optional, Tuple, Union
 
 from importlib import resources
 
@@ -30,6 +30,7 @@ class AudioFeedback:
         self._logger = logger
         # Enable if desired AND at least one backend is available
         self._enabled = enabled and (winsound is not None or sd is not None)
+        self._cache: Dict[str, Any] = {}
 
         if self._enabled:
             backend = "winsound" if winsound is not None else "sounddevice"
@@ -49,10 +50,12 @@ class AudioFeedback:
         # Try custom sound file first
         if override_path:
             try:
-                if winsound is not None:
-                    winsound.PlaySound(override_path, winsound.SND_FILENAME | winsound.SND_ASYNC)  # type: ignore[union-attr]
-                elif sd is not None:
-                    self._play_with_sounddevice(Path(override_path))
+                key = override_path
+                if key in self._cache:
+                    self._play_cached(self._cache[key])
+                else:
+                    data = self._load_and_cache(Path(override_path), key)
+                    self._play_cached(data)
                 return
             except Exception:
                 self._logger.warning("Error sound file failed: %s. Falling back to system beep.", override_path)
@@ -72,21 +75,32 @@ class AudioFeedback:
             if winsound is None and sd is None and platform.system() != "Windows":
                 self._logger.debug("Audio feedback disabled: no audio backend available on %s.", platform.system())
             return
+
+        cache_key = override_path or asset_name
         try:
+            if cache_key in self._cache:
+                self._play_cached(self._cache[cache_key])
+                return
+
             with self._get_sound_path(asset_name, override_path) as path:
-                if winsound is not None:
-                    winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC)  # type: ignore[union-attr]
-                elif sd is not None:
-                    self._play_with_sounddevice(path)
+                data = self._load_and_cache(path, cache_key)
+                self._play_cached(data)
         except FileNotFoundError:
             self._logger.warning("Sound file missing: %s", override_path or asset_name)
         except Exception as exc:  # pragma: no cover - defensive
             self._logger.exception("Failed to play sound %s: %s", asset_name, exc)
 
-    def _play_with_sounddevice(self, path: Path) -> None:
+    def _load_and_cache(self, path: Path, key: str) -> Any:
+        if winsound is not None:
+            with open(path, "rb") as f:
+                data = f.read()
+            self._cache[key] = data
+            return data
+
+        # Fallback to sounddevice
         if np is None:
             self._logger.error("numpy not available for sounddevice playback")
-            return
+            return None
 
         with wave.open(str(path), 'rb') as wf:
             samplerate = wf.getframerate()
@@ -97,7 +111,19 @@ class AudioFeedback:
             if channels > 1:
                 audio_data = audio_data.reshape(-1, channels)
 
-            # sounddevice.play is asynchronous (returns immediately)
+            data = (audio_data, samplerate)
+            self._cache[key] = data
+            return data
+
+    def _play_cached(self, data: Any) -> None:
+        if data is None:
+            return
+
+        if winsound is not None:
+            # winsound.SND_MEMORY = 0x0004
+            winsound.PlaySound(data, winsound.SND_MEMORY | winsound.SND_ASYNC)  # type: ignore[union-attr]
+        elif sd is not None:
+            audio_data, samplerate = data
             sd.play(audio_data, samplerate)
 
     @contextmanager
