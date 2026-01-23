@@ -12,6 +12,8 @@ ASSETS_ROOT = PROJECT_ROOT / "src" / "chirp" / "assets"
 MODELS_ROOT = ASSETS_ROOT / "models"
 CONFIG_PATH = PROJECT_ROOT / "config.toml"
 
+MAX_ALLOWED_DURATION = 7200.0  # 2 hours
+
 
 @dataclass(kw_only=True, slots=True)
 class ChirpConfig:
@@ -84,6 +86,11 @@ class ChirpConfig:
         if self.max_recording_duration < 0:
             raise ValueError(
                 f"max_recording_duration must be non-negative, got {self.max_recording_duration}"
+            )
+
+        if self.max_recording_duration > MAX_ALLOWED_DURATION:
+            raise ValueError(
+                f"max_recording_duration must be <= {MAX_ALLOWED_DURATION}, got {self.max_recording_duration}"
             )
 
         if self.start_sound_path:

@@ -40,6 +40,12 @@ class TestConfigValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "max_recording_duration must be non-negative"):
             conf.validate()
 
+    def test_validate_max_recording_duration_excessive(self):
+        """Excessive max_recording_duration should fail validation (DoS prevention)."""
+        conf = ChirpConfig(max_recording_duration=7201.0)
+        with self.assertRaisesRegex(ValueError, "max_recording_duration must be <="):
+            conf.validate()
+
     def test_validate_sound_path_missing(self):
         """Non-existent sound paths should fail validation."""
         conf = ChirpConfig(start_sound_path="/this/path/absolutely/should/not/exist.wav")
