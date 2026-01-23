@@ -153,7 +153,6 @@ class TextInjector:
 def _normalize_punctuation(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"\s+([,.;!?])", r"\1", text)
-    text = text.replace(" ,", ",").replace(" .", ".")
     return text.strip()
 
 
