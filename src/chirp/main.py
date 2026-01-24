@@ -60,9 +60,10 @@ class ChirpApp:
                 break
         if not console:
             console = Console(stderr=True)
+        self.console = console
 
         try:
-            with console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
+            with self.console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
                 self.parakeet = ParakeetManager(
                     model_name=self.config.parakeet_model,
                     quantization=self.config.parakeet_quantization,
@@ -153,7 +154,8 @@ class ChirpApp:
             self.logger.warning("No audio samples captured")
             return
         try:
-            text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
+            with self.console.status("[bold cyan]Transcribing...[/bold cyan]", spinner="dots"):
+                text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
         except Exception as exc:
             self.logger.exception("Transcription failed: %s", exc)
             self.audio_feedback.play_error(self.config.error_sound_path)
