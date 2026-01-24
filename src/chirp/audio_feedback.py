@@ -5,7 +5,7 @@ import platform
 import wave
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, Optional
 
 from importlib import resources
 
@@ -141,6 +141,13 @@ class AudioFeedback:
                 if channels > 1:
                     audio_data = audio_data.reshape(-1, channels)
 
+                # Optimization: Pre-apply volume scaling during load
+                if self._volume < 1.0:
+                    # Convert to float32, scale, then back to int16 to avoid overflow
+                    audio_data = (audio_data.astype(np.float32) * self._volume).astype(
+                        np.int16
+                    )
+
                 data = (audio_data, samplerate)
                 self._cache[key] = data
                 return data
@@ -157,13 +164,8 @@ class AudioFeedback:
 
         if self._use_sounddevice:
             audio_data, samplerate = data
-            # Apply volume scaling
-            if self._volume < 1.0:
-                # Convert to float32, scale, then back to int16 to avoid overflow
-                scaled = (audio_data.astype(np.float32) * self._volume).astype(np.int16)
-            else:
-                scaled = audio_data
-            sd.play(scaled, samplerate)
+            # Data is already scaled in _load_and_cache
+            sd.play(audio_data, samplerate)
         elif self._has_winsound:
             # Windows: data is a file path string; use SND_FILENAME for async playback
             winsound.PlaySound(

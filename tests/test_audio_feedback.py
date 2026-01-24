@@ -84,8 +84,8 @@ class TestAudioFeedback(unittest.TestCase):
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.np")
     @patch("chirp.audio_feedback.winsound", None)
-    def test_play_cached_with_volume_scaling(self, mock_np, mock_sd):
-        """_play_cached should scale audio when volume < 1.0."""
+    def test_play_cached_passes_data(self, mock_np, mock_sd):
+        """_play_cached should pass data directly to sd.play without scaling."""
         import numpy as np
 
         # Create real numpy array for testing
@@ -103,14 +103,50 @@ class TestAudioFeedback(unittest.TestCase):
         # Verify sd.play was called
         mock_sd.play.assert_called_once()
         call_args = mock_sd.play.call_args[0]
-        scaled_audio = call_args[0]
+        played_audio = call_args[0]
         samplerate = call_args[1]
 
-        # Check scaling was applied (values should be halved)
+        # Check data was passed through WITHOUT scaling (scaling happens in load)
         self.assertEqual(samplerate, 44100)
-        self.assertEqual(scaled_audio[0], 500)
-        self.assertEqual(scaled_audio[1], -500)
-        self.assertEqual(scaled_audio[2], 1000)
+        self.assertEqual(played_audio[0], 1000)
+        self.assertEqual(played_audio[1], -1000)
+        self.assertEqual(played_audio[2], 2000)
+
+    @patch("chirp.audio_feedback.sd")
+    @patch("chirp.audio_feedback.np")
+    @patch("chirp.audio_feedback.wave")
+    @patch("chirp.audio_feedback.winsound", None)
+    def test_load_and_cache_scales_volume(self, mock_wave, mock_np, mock_sd):
+        """_load_and_cache should scale audio when volume < 1.0."""
+        import numpy as np
+
+        # Create real numpy array for testing
+        mock_np.int16 = np.int16
+        mock_np.float32 = np.float32
+        # mock_np.frombuffer is mocked by MagicMock by default, we override it below
+
+        af = AudioFeedback(logger=self.mock_logger, enabled=True, volume=0.5)
+
+        # Setup wave mock
+        mock_wf = MagicMock()
+        mock_wave.open.return_value.__enter__.return_value = mock_wf
+        mock_wf.getframerate.return_value = 44100
+        mock_wf.getnchannels.return_value = 1
+        mock_wf.readframes.return_value = b"\x00" * 10  # dummy data
+
+        # Use a real array for frombuffer so we can test scaling
+        real_data = np.array([1000, -1000, 2000], dtype=np.int16)
+        mock_np.frombuffer = MagicMock(return_value=real_data)
+
+        key = "test_key_scaling"
+        data = af._load_and_cache(Path("/fake/sound.wav"), key)
+
+        # Check returned data is scaled
+        audio_data, samplerate = data
+        self.assertEqual(samplerate, 44100)
+        self.assertEqual(audio_data[0], 500)
+        self.assertEqual(audio_data[1], -500)
+        self.assertEqual(audio_data[2], 1000)
 
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.winsound", None)
