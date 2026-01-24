@@ -83,8 +83,7 @@ class TextInjector:
 
     def process(self, text: str) -> str:
         # Sanitize input: remove non-printable characters (e.g. control codes) to prevent injection
-        safe_chars = [ch for ch in text if ch.isprintable() or ch in " \t\n"]
-        result = "".join(safe_chars).strip()
+        result = self._sanitize(text, strip_text=True)
 
         if not result:
             return result
@@ -92,7 +91,16 @@ class TextInjector:
         result = self._apply_word_overrides(result)
         result = _normalize_punctuation(result)
         result = self._style.apply(result)
-        return result
+
+        # Final sanitization: ensure no unsafe characters were introduced by overrides or styling
+        # Note: Do not strip output, as word_overrides or styling might intentionally add whitespace.
+        return self._sanitize(result, strip_text=False)
+
+    @staticmethod
+    def _sanitize(text: str, strip_text: bool = True) -> str:
+        safe_chars = [ch for ch in text if ch.isprintable() or ch in " \t\n"]
+        result = "".join(safe_chars)
+        return result.strip() if strip_text else result
 
     def inject(self, text: str) -> None:
         processed = self.process(text)
