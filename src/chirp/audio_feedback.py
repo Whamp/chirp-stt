@@ -141,6 +141,12 @@ class AudioFeedback:
                 if channels > 1:
                     audio_data = audio_data.reshape(-1, channels)
 
+                # Pre-apply volume scaling
+                if self._volume < 1.0:
+                    audio_data = (audio_data.astype(np.float32) * self._volume).astype(
+                        np.int16
+                    )
+
                 data = (audio_data, samplerate)
                 self._cache[key] = data
                 return data
@@ -157,13 +163,8 @@ class AudioFeedback:
 
         if self._use_sounddevice:
             audio_data, samplerate = data
-            # Apply volume scaling
-            if self._volume < 1.0:
-                # Convert to float32, scale, then back to int16 to avoid overflow
-                scaled = (audio_data.astype(np.float32) * self._volume).astype(np.int16)
-            else:
-                scaled = audio_data
-            sd.play(scaled, samplerate)
+            # Volume is already applied during load/cache
+            sd.play(audio_data, samplerate)
         elif self._has_winsound:
             # Windows: data is a file path string; use SND_FILENAME for async playback
             winsound.PlaySound(
