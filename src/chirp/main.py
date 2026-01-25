@@ -163,7 +163,7 @@ class ChirpApp:
         if not text.strip():
             self.logger.info("Transcription empty; skipping paste")
             return
-        self.logger.info("Transcription: %s", text)
+        self.logger.debug("Transcription: %s", text)
         self.text_injector.inject(text)
 
     def _log_capture_status(self, message: str) -> None:
