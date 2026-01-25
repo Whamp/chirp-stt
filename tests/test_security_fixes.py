@@ -44,6 +44,34 @@ class TestTextInjectorSecurity(unittest.TestCase):
         self.assertIn("Line1", processed)
         self.assertIn("Line2", processed)
 
+    def test_override_injection_sanitization(self):
+        """Verify that word_overrides cannot introduce control characters."""
+        overrides = {"unsafe": "back\x08space"}
+        injector = TextInjector(
+            keyboard_manager=self.mock_keyboard,
+            logger=self.logger,
+            paste_mode="ctrl",
+            word_overrides=overrides,
+            post_processing="",
+            clipboard_behavior=False,
+            clipboard_clear_delay=0.1,
+        )
+        processed = injector.process("unsafe")
+        self.assertNotIn("\x08", processed)
+        self.assertEqual(processed, "backspace")
+
+    def test_sanitize_preserves_whitespace(self):
+        """Verify that _sanitize with strip_text=False preserves whitespace."""
+        # Test the static method directly
+        text = "  spaced  "
+        sanitized = TextInjector._sanitize(text, strip_text=False)
+        self.assertEqual(sanitized, "  spaced  ")
+
+        # Verify it still removes control chars
+        dirty = "  spaced\x08  "
+        sanitized_dirty = TextInjector._sanitize(dirty, strip_text=False)
+        self.assertEqual(sanitized_dirty, "  spaced  ")
+
 
 class TestConfigSecurity(unittest.TestCase):
     def test_default_recording_limit(self):
