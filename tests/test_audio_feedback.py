@@ -83,34 +83,42 @@ class TestAudioFeedback(unittest.TestCase):
 
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.np")
+    @patch("chirp.audio_feedback.wave")
     @patch("chirp.audio_feedback.winsound", None)
-    def test_play_cached_with_volume_scaling(self, mock_np, mock_sd):
-        """_play_cached should scale audio when volume < 1.0."""
+    def test_load_and_cache_with_volume_scaling(self, mock_wave, mock_np, mock_sd):
+        """_load_and_cache should scale audio when volume < 1.0."""
         import numpy as np
 
         # Create real numpy array for testing
         mock_np.int16 = np.int16
         mock_np.float32 = np.float32
+        mock_np.frombuffer = MagicMock()
+
+        # Mock wave reading
+        mock_wf = MagicMock()
+        mock_wave.open.return_value.__enter__.return_value = mock_wf
+        mock_wf.getframerate.return_value = 44100
+        mock_wf.getnchannels.return_value = 1
+        mock_wf.readframes.return_value = b"\x00" * 2000  # Dummy bytes
+        mock_wf.getnframes.return_value = 1000
+
+        # Inject real numpy logic for frombuffer so we get an array back
+        # We need frombuffer to return something we control to verify scaling
+        original_audio = np.array([1000, -1000, 2000], dtype=np.int16)
+        mock_np.frombuffer.return_value = original_audio
 
         af = AudioFeedback(logger=self.mock_logger, enabled=True, volume=0.5)
 
-        # Use real numpy array
-        audio_data = np.array([1000, -1000, 2000], dtype=np.int16)
-        mock_data = (audio_data, 44100)
+        key = "test_key"
+        data = af._load_and_cache(Path("/fake/sound.wav"), key)
 
-        af._play_cached(mock_data)
-
-        # Verify sd.play was called
-        mock_sd.play.assert_called_once()
-        call_args = mock_sd.play.call_args[0]
-        scaled_audio = call_args[0]
-        samplerate = call_args[1]
+        audio_data, samplerate = data
 
         # Check scaling was applied (values should be halved)
         self.assertEqual(samplerate, 44100)
-        self.assertEqual(scaled_audio[0], 500)
-        self.assertEqual(scaled_audio[1], -500)
-        self.assertEqual(scaled_audio[2], 1000)
+        self.assertEqual(audio_data[0], 500)
+        self.assertEqual(audio_data[1], -500)
+        self.assertEqual(audio_data[2], 1000)
 
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.winsound", None)
