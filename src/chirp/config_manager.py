@@ -84,9 +84,9 @@ class ChirpConfig:
         if self.model_timeout < 0:
             raise ValueError(f"model_timeout must be non-negative, got {self.model_timeout}")
 
-        if self.max_recording_duration < 0:
+        if self.max_recording_duration <= 0:
             raise ValueError(
-                f"max_recording_duration must be non-negative, got {self.max_recording_duration}"
+                f"max_recording_duration must be positive, got {self.max_recording_duration}"
             )
 
         if self.max_recording_duration > MAX_ALLOWED_DURATION:

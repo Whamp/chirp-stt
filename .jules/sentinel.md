@@ -7,3 +7,8 @@
 **Vulnerability:** Control characters could be injected via `word_overrides` configuration, bypassing initial input sanitization.
 **Learning:** Initial input sanitization is insufficient when configuration data (overrides) can re-introduce unsafe characters during processing.
 **Prevention:** Implement "Output Sanitization" as a final step in data processing pipelines. Ensure sanitization logic is reusable and safe (e.g., does not unintentionally destroy formatting like trailing whitespace unless intended).
+
+## 2024-05-24 - Unbounded Audio Recording
+**Vulnerability:** The application allowed `max_recording_duration` to be set to 0, disabling the auto-stop feature and allowing unbounded memory growth during recording (DoS).
+**Learning:** "Infinite" duration features in memory-bound operations are a security risk (CWE-400). Hard limits are necessary even for local apps to prevent accidental crashes.
+**Prevention:** Enforce strict positive upper bounds on all resource-accumulating operations.
