@@ -34,10 +34,14 @@ class TestConfigValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "model_timeout must be non-negative"):
             conf.validate()
 
-    def test_validate_max_recording_duration_negative(self):
-        """Negative max_recording_duration should fail validation."""
+    def test_validate_max_recording_duration_non_positive(self):
+        """Non-positive max_recording_duration should fail validation."""
         conf = ChirpConfig(max_recording_duration=-1.0)
-        with self.assertRaisesRegex(ValueError, "max_recording_duration must be non-negative"):
+        with self.assertRaisesRegex(ValueError, "max_recording_duration must be positive"):
+            conf.validate()
+
+        conf = ChirpConfig(max_recording_duration=0)
+        with self.assertRaisesRegex(ValueError, "max_recording_duration must be positive"):
             conf.validate()
 
     def test_validate_max_recording_duration_excessive(self):
@@ -80,8 +84,8 @@ class TestConfigValidation(unittest.TestCase):
         conf.validate()  # Should not raise
 
     def test_valid_config_with_zero_timeouts(self):
-        """Zero timeouts (disable) should pass validation."""
-        conf = ChirpConfig(model_timeout=0, max_recording_duration=0)
+        """Zero timeouts for model_timeout should pass validation, but recording must be positive."""
+        conf = ChirpConfig(model_timeout=0, max_recording_duration=45.0)
         conf.validate()  # Should not raise
 
     def test_from_dict_then_validate(self):

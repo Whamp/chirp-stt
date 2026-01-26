@@ -79,10 +79,11 @@ class TestConfigSecurity(unittest.TestCase):
         config = ChirpConfig()
         self.assertEqual(config.max_recording_duration, 45.0)
 
-    def test_recording_limit_zero_disables(self):
-        """Verify that 0 can be used to disable the limit."""
+    def test_recording_limit_zero_invalid(self):
+        """Verify that 0 is no longer a valid recording limit (DoS prevention)."""
         config = ChirpConfig(max_recording_duration=0)
-        self.assertEqual(config.max_recording_duration, 0)
+        with self.assertRaisesRegex(ValueError, "max_recording_duration must be positive"):
+            config.validate()
 
 
 if __name__ == "__main__":
