@@ -107,6 +107,39 @@ class TestParakeetManager(unittest.TestCase):
         self.assertIsNone(manager._monitor_thread)
         self.assertIsNotNone(manager._model)
 
+    @patch("chirp.parakeet_manager.gc.collect")
+    @patch("chirp.parakeet_manager.onnx_asr")
+    @patch("chirp.parakeet_manager.time.time")
+    def test_unload_triggers_gc(self, mock_time, mock_onnx, mock_gc):
+        """Test that unloading the model triggers garbage collection."""
+        # Setup
+        mock_model_instance = MagicMock()
+        mock_onnx.load_model.return_value = mock_model_instance
+        mock_time.return_value = 1000.0
+
+        manager = ParakeetManager(
+            model_name="test",
+            quantization=None,
+            provider_key="cpu",
+            threads=1,
+            logger=self.logger,
+            model_dir=self.model_dir,
+            timeout=100.0,
+        )
+
+        # Advance time to trigger timeout
+        mock_time.return_value = 1200.0
+
+        # Action
+        manager._unload_model()
+
+        # Assert
+        self.assertIsNone(manager._model)
+        mock_gc.assert_called_once()
+
+        # Cleanup
+        manager._stop_monitor.set()
+
 
 if __name__ == "__main__":
     unittest.main()
