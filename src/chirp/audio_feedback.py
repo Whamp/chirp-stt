@@ -25,6 +25,9 @@ except ImportError:  # pragma: no cover - non-Windows development
     winsound = None  # type: ignore[assignment]
 
 
+MAX_AUDIO_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB limit
+
+
 class AudioFeedback:
     def __init__(
         self,
@@ -133,6 +136,14 @@ class AudioFeedback:
         if self._use_sounddevice:
             # Load as numpy array for volume-controlled playback via sounddevice
             with wave.open(str(path), "rb") as wf:
+                # Security check: prevent loading massive files into RAM
+                total_bytes = wf.getnframes() * wf.getnchannels() * wf.getsampwidth()
+                if total_bytes > MAX_AUDIO_FILE_SIZE_BYTES:
+                    raise ValueError(
+                        f"Audio file {path} is too large "
+                        f"({total_bytes} bytes > {MAX_AUDIO_FILE_SIZE_BYTES} limit)"
+                    )
+
                 samplerate = wf.getframerate()
                 channels = wf.getnchannels()
                 frames = wf.readframes(wf.getnframes())

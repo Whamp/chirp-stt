@@ -55,6 +55,7 @@ class TestAudioFeedback(unittest.TestCase):
         mock_wave.open.return_value.__enter__.return_value = mock_wf
         mock_wf.getframerate.return_value = 44100
         mock_wf.getnchannels.return_value = 1
+        mock_wf.getsampwidth.return_value = 2
         mock_wf.getnframes.return_value = 1000
         mock_wf.readframes.return_value = b"\x00" * 2000
 
@@ -99,6 +100,7 @@ class TestAudioFeedback(unittest.TestCase):
         mock_wave.open.return_value.__enter__.return_value = mock_wf
         mock_wf.getframerate.return_value = 44100
         mock_wf.getnchannels.return_value = 1
+        mock_wf.getsampwidth.return_value = 2
         mock_wf.readframes.return_value = b"\x00" * 2000  # Dummy bytes
         mock_wf.getnframes.return_value = 1000
 
