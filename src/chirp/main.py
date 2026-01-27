@@ -60,9 +60,10 @@ class ChirpApp:
                 break
         if not console:
             console = Console(stderr=True)
+        self.console = console
 
         try:
-            with console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
+            with self.console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
                 self.parakeet = ParakeetManager(
                     model_name=self.config.parakeet_model,
                     quantization=self.config.parakeet_quantization,
@@ -86,6 +87,7 @@ class ChirpApp:
         )
 
         self._recording = False
+        self._status_indicator = self.console.status("[bold red]Recording...[/bold red]", spinner="dots")
         self._lock = threading.Lock()
         self._stop_timer: Optional[threading.Timer] = None
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="Transcriber")
@@ -124,6 +126,7 @@ class ChirpApp:
         self._recording = True
         self.audio_feedback.play_start(self.config.start_sound_path)
         self.logger.info("Recording started")
+        self._status_indicator.start()
 
         if self.config.max_recording_duration > 0:
             self._stop_timer = threading.Timer(
@@ -143,6 +146,7 @@ class ChirpApp:
         self.logger.debug("Stopping audio capture")
         waveform = self.audio_capture.stop()
         self._recording = False
+        self._status_indicator.stop()
         self.audio_feedback.play_stop(self.config.stop_sound_path)
         self.logger.info("Recording stopped (%s samples)", waveform.size)
         self._executor.submit(self._transcribe_and_inject, waveform)
@@ -153,7 +157,8 @@ class ChirpApp:
             self.logger.warning("No audio samples captured")
             return
         try:
-            text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
+            with self.console.status("[bold yellow]Transcribing...[/bold yellow]", spinner="dots"):
+                text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
         except Exception as exc:
             self.logger.exception("Transcription failed: %s", exc)
             self.audio_feedback.play_error(self.config.error_sound_path)
