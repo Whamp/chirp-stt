@@ -5,7 +5,7 @@ import platform
 import wave
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, Optional
 
 from importlib import resources
 
@@ -23,6 +23,9 @@ try:
     import winsound  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover - non-Windows development
     winsound = None  # type: ignore[assignment]
+
+
+MAX_AUDIO_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 class AudioFeedback:
@@ -130,6 +133,9 @@ class AudioFeedback:
             self._logger.exception("Failed to play sound %s: %s", asset_name, exc)
 
     def _load_and_cache(self, path: Path, key: str) -> Any:
+        if path.stat().st_size > MAX_AUDIO_FILE_SIZE_BYTES:
+            raise ValueError(f"Audio file too large: {path} (max 5MB)")
+
         if self._use_sounddevice:
             # Load as numpy array for volume-controlled playback via sounddevice
             with wave.open(str(path), "rb") as wf:
