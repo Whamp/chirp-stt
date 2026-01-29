@@ -144,6 +144,35 @@ class TestAudioFeedback(unittest.TestCase):
         # Should still work, just at full volume
         self.assertTrue(af._enabled)
 
+    @patch("chirp.audio_feedback.sd")
+    @patch("chirp.audio_feedback.winsound", None)
+    def test_preload_start_populates_cache(self, mock_sd):
+        """preload_start should populate cache."""
+        af = AudioFeedback(logger=self.mock_logger, enabled=True)
+        af._load_and_cache = MagicMock(return_value="data")
+
+        with patch.object(af, "_get_sound_path") as mock_get_path:
+            mock_get_path.return_value.__enter__ = MagicMock(return_value=Path("/fake/ping-up.wav"))
+            mock_get_path.return_value.__exit__ = MagicMock(return_value=False)
+
+            af.preload_start()
+
+            af._load_and_cache.assert_called_once_with(Path("/fake/ping-up.wav"), "ping-up.wav")
+
+    @patch("chirp.audio_feedback.sd")
+    @patch("chirp.audio_feedback.winsound", None)
+    def test_preload_error_requires_override(self, mock_sd):
+        """preload_error should do nothing if no override path."""
+        af = AudioFeedback(logger=self.mock_logger, enabled=True)
+        af._load_and_cache = MagicMock()
+
+        af.preload_error(None)
+        af._load_and_cache.assert_not_called()
+
+        # Mocking _load_and_cache implies we don't need real files
+        af.preload_error("custom_error.wav")
+        af._load_and_cache.assert_called_once_with(Path("custom_error.wav"), "custom_error.wav")
+
 
 if __name__ == "__main__":
     unittest.main()
