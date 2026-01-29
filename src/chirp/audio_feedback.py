@@ -69,6 +69,23 @@ class AudioFeedback:
             else:
                 self._logger.debug("Audio feedback initialized using %s", backend)
 
+    def preload_start(self, override_path: Optional[str] = None) -> None:
+        self._preload("ping-up.wav", override_path)
+
+    def preload_stop(self, override_path: Optional[str] = None) -> None:
+        self._preload("ping-down.wav", override_path)
+
+    def preload_error(self, override_path: Optional[str] = None) -> None:
+        """Preload error sound if a custom path is configured."""
+        if not self._enabled or not override_path:
+            return
+        try:
+            key = override_path
+            if key not in self._cache:
+                self._load_and_cache(Path(override_path), key)
+        except Exception as exc:
+            self._logger.warning("Failed to preload error sound: %s", exc)
+
     def play_start(self, override_path: Optional[str] = None) -> None:
         self._play_sound("ping-up.wav", override_path)
 
@@ -128,6 +145,26 @@ class AudioFeedback:
             self._logger.warning("Sound file missing: %s", override_path or asset_name)
         except Exception as exc:  # pragma: no cover - defensive
             self._logger.exception("Failed to play sound %s: %s", asset_name, exc)
+
+    def _preload(self, asset_name: str, override_path: Optional[str]) -> None:
+        if not self._enabled:
+            return
+
+        cache_key = override_path or asset_name
+        if cache_key in self._cache:
+            return
+
+        try:
+            with self._get_sound_path(asset_name, override_path) as path:
+                self._load_and_cache(path, cache_key)
+        except FileNotFoundError:
+            self._logger.warning(
+                "Failed to preload sound: %s", override_path or asset_name
+            )
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to preload sound %s: %s", override_path or asset_name, exc
+            )
 
     def _load_and_cache(self, path: Path, key: str) -> Any:
         if self._use_sounddevice:

@@ -52,6 +52,9 @@ class ChirpApp:
             enabled=self.config.audio_feedback,
             volume=self.config.audio_feedback_volume,
         )
+        self.audio_feedback.preload_start(self.config.start_sound_path)
+        self.audio_feedback.preload_stop(self.config.stop_sound_path)
+        self.audio_feedback.preload_error(self.config.error_sound_path)
 
         console = None
         for handler in self.logger.handlers:
