@@ -1,6 +1,5 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
 import logging
 
 from chirp.audio_feedback import AudioFeedback
