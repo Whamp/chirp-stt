@@ -65,11 +65,15 @@ class ParakeetManager:
                 self._unload_model()
 
     def _unload_model(self) -> None:
+        should_gc = False
         with self._lock:
             if self._model is not None and (time.time() - self._last_access > self._timeout):
                 self._logger.info("Unloading Parakeet model to free memory.")
                 self._model = None
-                gc.collect()
+                should_gc = True
+
+        if should_gc:
+            gc.collect()
 
     def ensure_loaded(self):
         with self._lock:
