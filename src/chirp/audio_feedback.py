@@ -25,6 +25,9 @@ except ImportError:  # pragma: no cover - non-Windows development
     winsound = None  # type: ignore[assignment]
 
 
+MAX_AUDIO_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
 class AudioFeedback:
     def __init__(
         self,
@@ -130,6 +133,13 @@ class AudioFeedback:
             self._logger.exception("Failed to play sound %s: %s", asset_name, exc)
 
     def _load_and_cache(self, path: Path, key: str) -> Any:
+        # Security check: prevent loading massive files (DoS)
+        file_size = path.stat().st_size
+        if file_size > MAX_AUDIO_FILE_SIZE_BYTES:
+            raise ValueError(
+                f"Audio file '{path.name}' too large ({file_size} > {MAX_AUDIO_FILE_SIZE_BYTES} bytes)"
+            )
+
         if self._use_sounddevice:
             # Load as numpy array for volume-controlled playback via sounddevice
             with wave.open(str(path), "rb") as wf:

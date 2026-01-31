@@ -62,7 +62,9 @@ class TestAudioFeedback(unittest.TestCase):
         mock_np.frombuffer.return_value = mock_audio_data
 
         key = "test_key"
-        data = af._load_and_cache(Path("/fake/sound.wav"), key)
+        with patch.object(Path, "stat") as mock_stat:
+            mock_stat.return_value.st_size = 1024
+            data = af._load_and_cache(Path("/fake/sound.wav"), key)
 
         mock_wave.open.assert_called_with("/fake/sound.wav", "rb")
         mock_np.frombuffer.assert_called()
@@ -110,7 +112,9 @@ class TestAudioFeedback(unittest.TestCase):
         af = AudioFeedback(logger=self.mock_logger, enabled=True, volume=0.5)
 
         key = "test_key"
-        data = af._load_and_cache(Path("/fake/sound.wav"), key)
+        with patch.object(Path, "stat") as mock_stat:
+            mock_stat.return_value.st_size = 1024
+            data = af._load_and_cache(Path("/fake/sound.wav"), key)
 
         audio_data, samplerate = data
 
