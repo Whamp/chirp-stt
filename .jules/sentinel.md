@@ -7,3 +7,8 @@
 **Vulnerability:** Control characters could be injected via `word_overrides` configuration, bypassing initial input sanitization.
 **Learning:** Initial input sanitization is insufficient when configuration data (overrides) can re-introduce unsafe characters during processing.
 **Prevention:** Implement "Output Sanitization" as a final step in data processing pipelines. Ensure sanitization logic is reusable and safe (e.g., does not unintentionally destroy formatting like trailing whitespace unless intended).
+
+## 2025-05-21 - Security Documentation Drift
+**Vulnerability:** A documented 5MB audio file size limit was missing in the actual implementation, exposing the app to DoS via memory exhaustion.
+**Learning:** Security controls mentioned in documentation or developer memory may not exist or may have been regressed.
+**Prevention:** Verify all documented security controls with automated tests. Trust code, not docs.
