@@ -5,7 +5,7 @@ import platform
 import wave
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, Optional
 
 from importlib import resources
 
