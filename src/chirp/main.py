@@ -53,6 +53,11 @@ class ChirpApp:
             volume=self.config.audio_feedback_volume,
         )
 
+        # Preload audio assets to minimize latency during interaction
+        self.audio_feedback.preload_start(self.config.start_sound_path)
+        self.audio_feedback.preload_stop(self.config.stop_sound_path)
+        self.audio_feedback.preload_error(self.config.error_sound_path)
+
         console = None
         for handler in self.logger.handlers:
             if isinstance(handler, RichHandler):

@@ -72,8 +72,14 @@ class AudioFeedback:
     def play_start(self, override_path: Optional[str] = None) -> None:
         self._play_sound("ping-up.wav", override_path)
 
+    def preload_start(self, override_path: Optional[str] = None) -> None:
+        self._ensure_cached("ping-up.wav", override_path)
+
     def play_stop(self, override_path: Optional[str] = None) -> None:
         self._play_sound("ping-down.wav", override_path)
+
+    def preload_stop(self, override_path: Optional[str] = None) -> None:
+        self._ensure_cached("ping-down.wav", override_path)
 
     def play_error(self, override_path: Optional[str] = None) -> None:
         """Play error sound. Uses custom path, or falls back to system beep."""
@@ -105,6 +111,24 @@ class AudioFeedback:
         else:
             # No system beep on non-Windows, just log
             self._logger.debug("No error sound available (no winsound, no custom path)")
+
+    def preload_error(self, override_path: Optional[str] = None) -> None:
+        if override_path:
+            self._ensure_cached("", override_path)
+
+    def _ensure_cached(self, asset_name: str, override_path: Optional[str]) -> None:
+        if not self._enabled:
+            return
+
+        cache_key = override_path or asset_name
+        if cache_key in self._cache:
+            return
+
+        try:
+            with self._get_sound_path(asset_name, override_path) as path:
+                self._load_and_cache(path, cache_key)
+        except Exception as exc:
+            self._logger.warning("Failed to preload sound %s: %s", cache_key, exc)
 
     def _play_sound(self, asset_name: str, override_path: Optional[str]) -> None:
         if not self._enabled:
