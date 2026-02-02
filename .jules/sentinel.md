@@ -7,3 +7,8 @@
 **Vulnerability:** Control characters could be injected via `word_overrides` configuration, bypassing initial input sanitization.
 **Learning:** Initial input sanitization is insufficient when configuration data (overrides) can re-introduce unsafe characters during processing.
 **Prevention:** Implement "Output Sanitization" as a final step in data processing pipelines. Ensure sanitization logic is reusable and safe (e.g., does not unintentionally destroy formatting like trailing whitespace unless intended).
+
+## 2025-05-21 - Unbounded Resource Loading (DoS)
+**Vulnerability:** `AudioFeedback` loaded user-defined sound files entirely into memory without size checks.
+**Learning:** Local apps are still vulnerable to DoS via configuration if they blindly trust file paths to fit in memory.
+**Prevention:** Enforce strict file size limits (e.g., `MAX_AUDIO_FILE_SIZE_BYTES`) before opening user-provided files.
