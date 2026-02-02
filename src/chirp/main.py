@@ -53,16 +53,18 @@ class ChirpApp:
             volume=self.config.audio_feedback_volume,
         )
 
-        console = None
+        self.console = None
         for handler in self.logger.handlers:
             if isinstance(handler, RichHandler):
-                console = handler.console
+                self.console = handler.console
                 break
-        if not console:
-            console = Console(stderr=True)
+        if not self.console:
+            self.console = Console(stderr=True)
+
+        self.status_indicator = self.console.status("Ready")
 
         try:
-            with console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
+            with self.console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
                 self.parakeet = ParakeetManager(
                     model_name=self.config.parakeet_model,
                     quantization=self.config.parakeet_quantization,
@@ -122,6 +124,8 @@ class ChirpApp:
             self.audio_feedback.play_error(self.config.error_sound_path)
             return
         self._recording = True
+        self.status_indicator.update("[bold red]Recording...[/bold red]", spinner="point")
+        self.status_indicator.start()
         self.audio_feedback.play_start(self.config.start_sound_path)
         self.logger.info("Recording started")
 
@@ -143,28 +147,33 @@ class ChirpApp:
         self.logger.debug("Stopping audio capture")
         waveform = self.audio_capture.stop()
         self._recording = False
+        self.status_indicator.update("[bold green]Transcribing...[/bold green]", spinner="dots")
         self.audio_feedback.play_stop(self.config.stop_sound_path)
         self.logger.info("Recording stopped (%s samples)", waveform.size)
         self._executor.submit(self._transcribe_and_inject, waveform)
 
     def _transcribe_and_inject(self, waveform) -> None:
-        start_time = time.perf_counter()
-        if waveform.size == 0:
-            self.logger.warning("No audio samples captured")
-            return
         try:
-            text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
-        except Exception as exc:
-            self.logger.exception("Transcription failed: %s", exc)
-            self.audio_feedback.play_error(self.config.error_sound_path)
-            return
-        duration = time.perf_counter() - start_time
-        self.logger.debug("Transcription finished in %.2fs (chars=%s)", duration, len(text))
-        if not text.strip():
-            self.logger.info("Transcription empty; skipping paste")
-            return
-        self.logger.debug("Transcription: %s", text)
-        self.text_injector.inject(text)
+            start_time = time.perf_counter()
+            if waveform.size == 0:
+                self.logger.warning("No audio samples captured")
+                return
+            try:
+                text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
+            except Exception as exc:
+                self.logger.exception("Transcription failed: %s", exc)
+                self.audio_feedback.play_error(self.config.error_sound_path)
+                return
+            duration = time.perf_counter() - start_time
+            self.logger.debug("Transcription finished in %.2fs (chars=%s)", duration, len(text))
+            if not text.strip():
+                self.logger.info("Transcription empty; skipping paste")
+                return
+            self.logger.debug("Transcription: %s", text)
+            self.text_injector.inject(text)
+        finally:
+            if not self._recording:
+                self.status_indicator.stop()
 
     def _log_capture_status(self, message: str) -> None:
         self.logger.debug("Audio status: %s", message)
