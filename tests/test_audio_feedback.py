@@ -50,27 +50,31 @@ class TestAudioFeedback(unittest.TestCase):
         """_load_and_cache should read WAV and cache data."""
         af = AudioFeedback(logger=self.mock_logger, enabled=True)
 
-        # Setup wave mock
-        mock_wf = MagicMock()
-        mock_wave.open.return_value.__enter__.return_value = mock_wf
-        mock_wf.getframerate.return_value = 44100
-        mock_wf.getnchannels.return_value = 1
-        mock_wf.getnframes.return_value = 1000
-        mock_wf.readframes.return_value = b"\x00" * 2000
+        # Mock Path.stat to avoid FileNotFoundError and pass size check
+        with patch("pathlib.Path.stat") as mock_stat:
+            mock_stat.return_value.st_size = 1000  # Safe size
 
-        mock_audio_data = MagicMock()
-        mock_np.frombuffer.return_value = mock_audio_data
+            # Setup wave mock
+            mock_wf = MagicMock()
+            mock_wave.open.return_value.__enter__.return_value = mock_wf
+            mock_wf.getframerate.return_value = 44100
+            mock_wf.getnchannels.return_value = 1
+            mock_wf.getnframes.return_value = 1000
+            mock_wf.readframes.return_value = b"\x00" * 2000
 
-        key = "test_key"
-        data = af._load_and_cache(Path("/fake/sound.wav"), key)
+            mock_audio_data = MagicMock()
+            mock_np.frombuffer.return_value = mock_audio_data
 
-        mock_wave.open.assert_called_with("/fake/sound.wav", "rb")
-        mock_np.frombuffer.assert_called()
+            key = "test_key"
+            data = af._load_and_cache(Path("/fake/sound.wav"), key)
 
-        # Check returned data and cache
-        expected = (mock_audio_data, 44100)
-        self.assertEqual(data, expected)
-        self.assertEqual(af._cache[key], expected)
+            mock_wave.open.assert_called_with("/fake/sound.wav", "rb")
+            mock_np.frombuffer.assert_called()
+
+            # Check returned data and cache
+            expected = (mock_audio_data, 44100)
+            self.assertEqual(data, expected)
+            self.assertEqual(af._cache[key], expected)
 
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.winsound", None)
@@ -94,31 +98,35 @@ class TestAudioFeedback(unittest.TestCase):
         mock_np.float32 = np.float32
         mock_np.frombuffer = MagicMock()
 
-        # Mock wave reading
-        mock_wf = MagicMock()
-        mock_wave.open.return_value.__enter__.return_value = mock_wf
-        mock_wf.getframerate.return_value = 44100
-        mock_wf.getnchannels.return_value = 1
-        mock_wf.readframes.return_value = b"\x00" * 2000  # Dummy bytes
-        mock_wf.getnframes.return_value = 1000
+        # Mock Path.stat
+        with patch("pathlib.Path.stat") as mock_stat:
+            mock_stat.return_value.st_size = 1000
 
-        # Inject real numpy logic for frombuffer so we get an array back
-        # We need frombuffer to return something we control to verify scaling
-        original_audio = np.array([1000, -1000, 2000], dtype=np.int16)
-        mock_np.frombuffer.return_value = original_audio
+            # Mock wave reading
+            mock_wf = MagicMock()
+            mock_wave.open.return_value.__enter__.return_value = mock_wf
+            mock_wf.getframerate.return_value = 44100
+            mock_wf.getnchannels.return_value = 1
+            mock_wf.readframes.return_value = b"\x00" * 2000  # Dummy bytes
+            mock_wf.getnframes.return_value = 1000
 
-        af = AudioFeedback(logger=self.mock_logger, enabled=True, volume=0.5)
+            # Inject real numpy logic for frombuffer so we get an array back
+            # We need frombuffer to return something we control to verify scaling
+            original_audio = np.array([1000, -1000, 2000], dtype=np.int16)
+            mock_np.frombuffer.return_value = original_audio
 
-        key = "test_key"
-        data = af._load_and_cache(Path("/fake/sound.wav"), key)
+            af = AudioFeedback(logger=self.mock_logger, enabled=True, volume=0.5)
 
-        audio_data, samplerate = data
+            key = "test_key"
+            data = af._load_and_cache(Path("/fake/sound.wav"), key)
 
-        # Check scaling was applied (values should be halved)
-        self.assertEqual(samplerate, 44100)
-        self.assertEqual(audio_data[0], 500)
-        self.assertEqual(audio_data[1], -500)
-        self.assertEqual(audio_data[2], 1000)
+            audio_data, samplerate = data
+
+            # Check scaling was applied (values should be halved)
+            self.assertEqual(samplerate, 44100)
+            self.assertEqual(audio_data[0], 500)
+            self.assertEqual(audio_data[1], -500)
+            self.assertEqual(audio_data[2], 1000)
 
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.winsound", None)
