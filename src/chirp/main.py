@@ -53,6 +53,15 @@ class ChirpApp:
             volume=self.config.audio_feedback_volume,
         )
 
+        if self.config.audio_feedback:
+            # Preload sounds to minimize latency on first use
+            self.audio_feedback.preload("ping-up.wav", self.config.start_sound_path)
+            self.audio_feedback.preload("ping-down.wav", self.config.stop_sound_path)
+            if self.config.error_sound_path:
+                self.audio_feedback.preload(
+                    "error-placeholder", self.config.error_sound_path
+                )
+
         console = None
         for handler in self.logger.handlers:
             if isinstance(handler, RichHandler):

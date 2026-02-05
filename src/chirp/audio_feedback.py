@@ -69,6 +69,23 @@ class AudioFeedback:
             else:
                 self._logger.debug("Audio feedback initialized using %s", backend)
 
+    def preload(self, asset_name: str, override_path: Optional[str] = None) -> None:
+        """Preload a sound file into the cache to avoid latency on first play."""
+        if not self._enabled:
+            return
+
+        cache_key = override_path or asset_name
+        if cache_key in self._cache:
+            return
+
+        try:
+            with self._get_sound_path(asset_name, override_path) as path:
+                self._load_and_cache(path, cache_key)
+        except (FileNotFoundError, Exception) as exc:
+            self._logger.warning(
+                "Failed to preload sound %s: %s", override_path or asset_name, exc
+            )
+
     def play_start(self, override_path: Optional[str] = None) -> None:
         self._play_sound("ping-up.wav", override_path)
 
