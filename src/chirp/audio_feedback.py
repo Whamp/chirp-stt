@@ -130,6 +130,18 @@ class AudioFeedback:
             self._logger.exception("Failed to play sound %s: %s", asset_name, exc)
 
     def _load_and_cache(self, path: Path, key: str) -> Any:
+        # Security: Enforce 5MB limit to prevent memory exhaustion
+        MAX_AUDIO_FILE_SIZE_BYTES = 5 * 1024 * 1024
+        try:
+            if path.stat().st_size > MAX_AUDIO_FILE_SIZE_BYTES:
+                self._logger.warning(
+                    "Audio file %s too large (max 5MB), skipping.", path
+                )
+                return None
+        except OSError:
+            # File might not exist or be inaccessible; let downstream handle it
+            pass
+
         if self._use_sounddevice:
             # Load as numpy array for volume-controlled playback via sounddevice
             with wave.open(str(path), "rb") as wf:
