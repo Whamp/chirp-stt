@@ -107,6 +107,29 @@ class TestParakeetManager(unittest.TestCase):
         self.assertIsNone(manager._monitor_thread)
         self.assertIsNotNone(manager._model)
 
+    @patch("chirp.parakeet_manager.onnx_asr")
+    def test_warmup(self, mock_onnx):
+        """Test that warmup calls transcribe with dummy audio."""
+        mock_onnx.load_model.return_value = MagicMock()
+        manager = ParakeetManager(
+            model_name="test",
+            quantization=None,
+            provider_key="cpu",
+            threads=1,
+            logger=self.logger,
+            model_dir=self.model_dir,
+            timeout=100.0,
+        )
+
+        # We can mock transcribe to ensure it's called
+        with patch.object(manager, 'transcribe') as mock_transcribe:
+            manager.warmup()
+            mock_transcribe.assert_called_once()
+            args, _ = mock_transcribe.call_args
+            audio_arg = args[0]
+            self.assertEqual(audio_arg.shape, (16000,))
+            self.assertEqual(audio_arg.dtype, np.float32)
+
 
 if __name__ == "__main__":
     unittest.main()

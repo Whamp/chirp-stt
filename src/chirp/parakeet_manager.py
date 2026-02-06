@@ -123,6 +123,15 @@ class ParakeetManager:
                 f"Model not found at {self._model_dir} — run: uv run chirp-setup"
             ) from exc
 
+    def warmup(self) -> None:
+        """Run a dummy inference to initialize internal buffers and optimize execution graph."""
+        self._logger.debug("Warming up Parakeet model...")
+        dummy_audio = np.zeros(16_000, dtype=np.float32)
+        try:
+            self.transcribe(dummy_audio)
+        except Exception as exc:
+            self._logger.warning("Warmup failed (non-fatal): %s", exc)
+
     def transcribe(self, audio: np.ndarray, *, sample_rate: int = 16_000, language: Optional[str] = None) -> str:
         with self._lock:
             self._last_access = time.time()
