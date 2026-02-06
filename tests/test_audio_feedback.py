@@ -43,12 +43,16 @@ class TestAudioFeedback(unittest.TestCase):
             af._load_and_cache.assert_called_once()
             af._play_cached.assert_called_once_with("data")
 
+    @patch("pathlib.Path.stat")
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.np")
     @patch("chirp.audio_feedback.wave")
-    def test_load_and_cache_sounddevice(self, mock_wave, mock_np, mock_sd):
+    def test_load_and_cache_sounddevice(self, mock_wave, mock_np, mock_sd, mock_stat):
         """_load_and_cache should read WAV and cache data."""
         af = AudioFeedback(logger=self.mock_logger, enabled=True)
+
+        # Mock valid file size
+        mock_stat.return_value.st_size = 1024
 
         # Setup wave mock
         mock_wf = MagicMock()
@@ -81,13 +85,17 @@ class TestAudioFeedback(unittest.TestCase):
         af._play_cached(mock_data)
         mock_sd.play.assert_called_with(mock_data[0], 44100)
 
+    @patch("pathlib.Path.stat")
     @patch("chirp.audio_feedback.sd")
     @patch("chirp.audio_feedback.np")
     @patch("chirp.audio_feedback.wave")
     @patch("chirp.audio_feedback.winsound", None)
-    def test_load_and_cache_with_volume_scaling(self, mock_wave, mock_np, mock_sd):
+    def test_load_and_cache_with_volume_scaling(self, mock_wave, mock_np, mock_sd, mock_stat):
         """_load_and_cache should scale audio when volume < 1.0."""
         import numpy as np
+
+        # Mock valid file size
+        mock_stat.return_value.st_size = 1024
 
         # Create real numpy array for testing
         mock_np.int16 = np.int16
