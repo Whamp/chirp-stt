@@ -6,7 +6,7 @@ import logging
 import platform
 import threading
 import time
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import numpy as np
 
@@ -60,9 +60,11 @@ class ChirpApp:
                 break
         if not console:
             console = Console(stderr=True)
+        self.console = console
+        self.status_indicator: Optional[Any] = None
 
         try:
-            with console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
+            with self.console.status("[bold green]Initializing Parakeet model...[/bold green]", spinner="dots"):
                 self.parakeet = ParakeetManager(
                     model_name=self.config.parakeet_model,
                     quantization=self.config.parakeet_quantization,
@@ -94,7 +96,9 @@ class ChirpApp:
         try:
             self._register_hotkey()
             self.logger.info("Chirp ready. Toggle recording with %s", self.config.primary_shortcut)
-            self.keyboard.wait()
+            with self.console.status("Ready", spinner="dots") as status:
+                self.status_indicator = status
+                self.keyboard.wait()
         except KeyboardInterrupt:
             self.logger.info("Interrupted, exiting.")
 
@@ -116,10 +120,14 @@ class ChirpApp:
     def _start_recording(self) -> None:
         self.logger.debug("Starting audio capture")
         try:
+            if self.status_indicator:
+                self.status_indicator.update("[bold red]Recording...[/bold red]", spinner="point")
             self.audio_capture.start()
         except Exception as exc:
             self.logger.error("Audio capture start failed: %s", exc)
             self.audio_feedback.play_error(self.config.error_sound_path)
+            if self.status_indicator:
+                self.status_indicator.update("Ready", spinner="dots")
             return
         self._recording = True
         self.audio_feedback.play_start(self.config.start_sound_path)
@@ -141,6 +149,9 @@ class ChirpApp:
             self._stop_timer = None
 
         self.logger.debug("Stopping audio capture")
+        if self.status_indicator:
+            self.status_indicator.update("[bold green]Transcribing...[/bold green]", spinner="dots")
+
         waveform = self.audio_capture.stop()
         self._recording = False
         self.audio_feedback.play_stop(self.config.stop_sound_path)
@@ -148,23 +159,27 @@ class ChirpApp:
         self._executor.submit(self._transcribe_and_inject, waveform)
 
     def _transcribe_and_inject(self, waveform) -> None:
-        start_time = time.perf_counter()
-        if waveform.size == 0:
-            self.logger.warning("No audio samples captured")
-            return
         try:
-            text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
-        except Exception as exc:
-            self.logger.exception("Transcription failed: %s", exc)
-            self.audio_feedback.play_error(self.config.error_sound_path)
-            return
-        duration = time.perf_counter() - start_time
-        self.logger.debug("Transcription finished in %.2fs (chars=%s)", duration, len(text))
-        if not text.strip():
-            self.logger.info("Transcription empty; skipping paste")
-            return
-        self.logger.debug("Transcription: %s", text)
-        self.text_injector.inject(text)
+            start_time = time.perf_counter()
+            if waveform.size == 0:
+                self.logger.warning("No audio samples captured")
+                return
+            try:
+                text = self.parakeet.transcribe(waveform, sample_rate=16_000, language=self.config.language)
+            except Exception as exc:
+                self.logger.exception("Transcription failed: %s", exc)
+                self.audio_feedback.play_error(self.config.error_sound_path)
+                return
+            duration = time.perf_counter() - start_time
+            self.logger.debug("Transcription finished in %.2fs (chars=%s)", duration, len(text))
+            if not text.strip():
+                self.logger.info("Transcription empty; skipping paste")
+                return
+            self.logger.debug("Transcription: %s", text)
+            self.text_injector.inject(text)
+        finally:
+            if self.status_indicator and not self._recording:
+                self.status_indicator.update("Ready", spinner="dots")
 
     def _log_capture_status(self, message: str) -> None:
         self.logger.debug("Audio status: %s", message)
