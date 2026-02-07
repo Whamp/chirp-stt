@@ -89,6 +89,31 @@ class TestParakeetManager(unittest.TestCase):
         time.sleep(0.05)
 
     @patch("chirp.parakeet_manager.onnx_asr")
+    def test_warmup(self, mock_onnx):
+        """Test that warmup performs dummy inference."""
+        mock_model_instance = MagicMock()
+        mock_onnx.load_model.return_value = mock_model_instance
+
+        manager = ParakeetManager(
+            model_name="test",
+            quantization=None,
+            provider_key="cpu",
+            threads=1,
+            logger=self.logger,
+            model_dir=self.model_dir,
+            timeout=100.0,
+        )
+
+        manager.warmup()
+
+        # Verify recognize was called with silent audio
+        mock_model_instance.recognize.assert_called_once()
+        args, _ = mock_model_instance.recognize.call_args
+        audio_arg = args[0]
+        self.assertEqual(audio_arg.shape, (16000,))
+        self.assertTrue(np.all(audio_arg == 0))
+
+    @patch("chirp.parakeet_manager.onnx_asr")
     def test_timeout_zero_disables_monitor(self, mock_onnx):
         """Test that timeout=0 disables the monitor thread."""
         mock_onnx.load_model.return_value = MagicMock()

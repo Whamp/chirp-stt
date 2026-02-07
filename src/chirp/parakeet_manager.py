@@ -78,6 +78,15 @@ class ParakeetManager:
                 self._model = self._load_model()
             return self._model
 
+    def warmup(self) -> None:
+        """Performs a dummy inference to initialize ONNX buffers."""
+        self._logger.debug("Warming up Parakeet model...")
+        dummy_audio = np.zeros(16_000, dtype=np.float32)
+        try:
+            self.transcribe(dummy_audio)
+        except Exception as exc:
+            self._logger.warning("Warmup failed: %s", exc)
+
     def _resolve_providers(self, key: str) -> Sequence[str]:
         normalized = key.lower()
         if normalized != "cpu":

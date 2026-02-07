@@ -72,6 +72,7 @@ class ChirpApp:
                     model_dir=model_dir,
                     timeout=self.config.model_timeout,
                 )
+                self.parakeet.warmup()
         except ModelNotPreparedError as exc:
             self.logger.error(str(exc))
             raise SystemExit(1) from exc
